@@ -31,14 +31,13 @@ import VerticalNavLink from '@layouts/components/VerticalNavLink.vue';
     <VerticalNavLink
       :item="{
         title: 'Data Kematian',
-        to: '/dashboard',
+        to: '/aktakematian',
       }"
     />
     <VerticalNavLink
       :item="{
         title: 'Data Pindah',
-        href: 'https://demos.themeselection.com/materio-vuetify-vuejs-admin-template/demo-1/dashboards/crm',
-        target: '_blank',
+        to: '/aktapindah',
       }"
     />
   </VerticalNavGroup>

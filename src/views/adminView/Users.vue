@@ -1,6 +1,10 @@
 <script lang="ts" setup>
 import { computed, ref } from 'vue';
 
+
+const router = useRouter() // ✅ ini yang bikin router bisa dipakai
+
+
 const users = [
   { username: 'Frozen Yogurt', email: 'frozen.yogurt@example.com', role: 'Admin' },
   { username: 'Ice cream sandwich', email: 'ice.cream.sandwich@example.com', role: 'Dinas Sosial' },
@@ -103,6 +107,9 @@ const updatePassword = () => {
   newPassword.value = ''
 }
 
+const goToAddUser = () => {
+  router.push('/users/add-user')
+}
 
 </script>
 
@@ -111,7 +118,7 @@ const updatePassword = () => {
   <!-- Title & Add Button -->
   <div class="d-flex justify-space-between align-center mb-4">
     <h3 class="text-h3 font-weight-bold">Daftar User</h3>
-    <v-btn color="primary" variant="flat">+ Tambah User</v-btn>
+    <v-btn @click="goToAddUser" color="primary" variant="flat">+ Tambah User</v-btn>
   </div>
 
   <!-- Card -->

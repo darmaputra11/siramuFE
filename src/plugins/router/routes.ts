@@ -1,3 +1,4 @@
+
 export const routes = [
   { path: '/', redirect: '/dashboard' },
   {
@@ -11,6 +12,26 @@ export const routes = [
       {
         path: 'users',
         component: () => import('@/views/adminView/Users.vue'),
+      },
+      {
+        path: 'users/add-user',
+        component: () => import('@/views/adminView/AddUser.vue'),
+      },
+      {
+        path: 'aktakematian',
+        component: () => import('@/views/adminView/AktaKematian.vue'),
+      },
+      {
+        path: 'aktakematian/create',
+        component: () => import('@/views/adminView/AddAktaKematian.vue'),
+      },
+      {
+        path: 'aktapindah',
+        component: () => import('@/views/adminView/AktaPindah.vue'),
+      },
+      {
+        path: 'aktapindah/create',
+        component: () => import('@/views/adminView/AddAktaPindah.vue'),
       },
       // {
       //   path: 'dashboard',
