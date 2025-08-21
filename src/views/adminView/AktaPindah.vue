@@ -43,6 +43,17 @@ const pindahList = [
   { id: 34, nik: '3201010101010034', nama: 'Sulastri', no_kk: '3271010101010034', nomor_pindah: 'P-034', tanggal_pindah: '2025-12-20', created_at: '2025-12-20', updated_at: '2025-12-20' },
 ]
 
+// Date range filter
+const startDate = ref<string | null>(null)
+const endDate = ref<string | null>(null)
+
+// Reset Filter
+const resetFilter = () => {
+  search.value = ''
+  startDate.value = null
+  endDate.value = null
+}
+
 
 // Pagination & search
 const page = ref(1)
@@ -68,9 +79,11 @@ const filteredData = computed(() => {
     const matchSearch =
       item.nama.toLowerCase().includes(search.value.toLowerCase()) ||
       item.nik.includes(search.value)
-    const matchMonth =
-      !bulanFilter.value || item.tanggal_pindah.slice(5, 7) === bulanFilter.value
-    return matchSearch && matchMonth
+   const itemDate = new Date(item.tanggal_pindah)
+    const matchDate =
+      (!startDate.value || itemDate >= new Date(startDate.value)) &&
+      (!endDate.value || itemDate <= new Date(endDate.value))
+    return matchSearch && matchDate
   })
 })
 
@@ -140,7 +153,7 @@ const exportExcel = () => {
 <div class="d-flex justify-space-between align-center mb-4">
   <!-- Kolom kiri: Title -->
   <div>
-    <h3 class="text-h3 font-weight-bold">Data Kematian</h3>
+    <h3 class="text-h3 font-weight-bold">Data Pindah Keluar</h3>
   </div>
 
   <!-- Kolom kanan: Tombol -->
@@ -168,17 +181,36 @@ const exportExcel = () => {
           clearable
           style="max-width: 250px"
         />
-        <v-select
-          v-model="bulanFilter"
-          :items="bulanOptions"
-          item-title="text"
-          item-value="value"
-          label="Filter Bulan"
-          variant="outlined"
-          dense
-          hide-details
-          style="max-width: 200px"
-        />
+        <v-text-field
+        v-model="startDate"
+        type="date"
+        label="Tanggal Awal"
+        variant="outlined"
+        dense
+        hide-details
+        style="max-width: 200px"
+      />
+
+      <v-text-field
+        v-model="endDate"
+        type="date"
+        label="Tanggal Akhir"
+        variant="outlined"
+        dense
+        hide-details
+        style="max-width: 200px"
+      />
+
+      <!-- Tombol Reset -->
+  <v-btn
+  color="secondary"
+  variant="text"
+  @click="resetFilter"
+  class="d-flex align-center"
+  style="height: 50px; min-width: 50px;"
+>
+  Reset Filter
+</v-btn>
       </div>
 
       <!-- Table -->

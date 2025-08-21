@@ -28,8 +28,8 @@
           <!-- Username -->
           <v-col cols="12" md="6" class="mb-6">
             <v-text-field
-              label="Username"
-              v-model="form.username"
+              label="Name"
+              v-model="form.name"
               outlined
               dense
               hide-details="auto"
@@ -90,36 +90,74 @@
 
         <!-- Tombol Simpan -->
         <div class="mt-6">
-          <v-btn color="primary" @click="submitForm">
-            Simpan
-          </v-btn>
+         <v-btn color="primary" :loading="loading" :disabled="loading" @click="submitForm">
+  Simpan
+</v-btn>
         </div>
       </v-form>
     </v-card-text>
   </v-card>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import { createUser } from '@/api/users'
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
+const token = localStorage.getItem('token') || ''
 
 const form = ref({
-  username: '',
+  name: '',
   email: '',
   password: '',
   password_confirmation: '',
-  role: '',
+  role: '', // label yang ditampilkan di select
 })
 
-const roles = ['Admin', 'Dinsos', 'Dinas Kesehatan', 'BPJS']
-
-const submitForm = () => {
-  console.log(form.value)
+const roles = ['Admin', 'Viewer']
+// mapping label UI -> kode role API
+const roleCodeMap: Record<string, string> = {
+  'Admin': 'admin',
+  'Viewer': 'viewer',
 }
 
-const goBack = () => {
+const loading = ref(false)
+
+async function submitForm() {
+  if (!form.value.name || !form.value.email || !form.value.password || !form.value.password_confirmation || !form.value.role) {
+    alert('Lengkapi semua field.')
+    return
+  }
+  if (form.value.password !== form.value.password_confirmation) {
+    alert('Password dan konfirmasi tidak sama.')
+    return
+  }
+
+  loading.value = true
+  try {
+    await createUser(token, {
+      name: form.value.name,                  // API pakai "name"
+      email: form.value.email,
+      password: form.value.password,
+      password_confirmation: form.value.password_confirmation,
+      role: roleCodeMap[form.value.role] || 'viewer',
+    })
+    // sukses → balik ke daftar user
+    router.push('/users')
+  } catch (e: any) {
+    const msg =
+      e?.response?.data?.message ||
+      (e?.response?.data && JSON.stringify(e.response.data)) ||
+      'Gagal menyimpan user.'
+    alert(msg)
+  } finally {
+    loading.value = false
+  }
+}
+
+function goBack() {
   router.back()
 }
 </script>
+

@@ -1,91 +1,99 @@
 <script lang="ts" setup>
-import { computed, ref } from 'vue';
+import type { UserRow } from '@/api/users'
+import { deleteUser, getUsers } from '@/api/users'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 
+const router = useRouter()
 
-const router = useRouter() // ✅ ini yang bikin router bisa dipakai
+// ====== STATE ======
+const token = localStorage.getItem('token') || ''
 
-
-const users = [
-  { username: 'Frozen Yogurt', email: 'frozen.yogurt@example.com', role: 'Admin' },
-  { username: 'Ice cream sandwich', email: 'ice.cream.sandwich@example.com', role: 'Dinas Sosial' },
-  { username: 'Eclair', email: 'eclair@example.com', role: 'User' },
-  { username: 'Cupcake', email: 'cupcake@example.com', role: 'User' },
-  { username: 'Gingerbread', email: 'gingerbread@example.com', role: 'User' },
-  { username: 'Donut', email: 'donut@example.com', role: 'User' },
-  { username: 'KitKat', email: 'kitkat@example.com', role: 'User' },
-  { username: 'Chocolate Cake', email: 'chocolate.cake@example.com', role: 'User' },
-  { username: 'KitKat', email: 'kitkat@example.com', role: 'User' },
-  { username: 'KitKat', email: 'kitkat@example.com', role: 'User' },
-  { username: 'KitKat', email: 'kitkat@example.com', role: 'User' },
-  { username: 'KitKat', email: 'kitkat@example.com', role: 'User' },
-  { username: 'KitKat', email: 'kitkat@example.com', role: 'User' },
-  { username: 'KitKat', email: 'kitkat@example.com', role: 'User' },
-  { username: 'KitKat', email: 'kitkat@example.com', role: 'User' },
-  { username: 'KitKat', email: 'kitkat@example.com', role: 'User' },
-  { username: 'KitKat', email: 'kitkat@example.com', role: 'User' },
-  { username: 'KitKat', email: 'kitkat@example.com', role: 'User' },
-  { username: 'KitKat', email: 'kitkat@example.com', role: 'User' },
-  { username: 'KitKat', email: 'kitkat@example.com', role: 'User' },
-  { username: 'KitKat', email: 'kitkat@example.com', role: 'User' },
-  { username: 'KitKat', email: 'kitkat@example.com', role: 'User' },
-  { username: 'KitKat', email: 'kitkat@example.com', role: 'User' },
-  { username: 'KitKat', email: 'kitkat@example.com', role: 'User' },
-  { username: 'KitKat', email: 'kitkat@example.com', role: 'User' },
-  { username: 'KitKat', email: 'kitkat@example.com', role: 'User' },
-]
-
-const dialog = ref(false)
-const selectedUser = ref<{ username: string; email: string; role: string } | null>(null)
-
-const openDetailDialog = (user: { username: string; email: string; role: string }) => {
-  selectedUser.value = user
-  dialog.value = true
-}
-
+const rows = ref<UserRow[]>([])
+const loading = ref(false)
 
 const page = ref(1)
 const itemsPerPage = ref(5)
-
 const itemsPerPageOptions = [5, 10, 50, 100]
 const search = ref('')
-const selectedRows = ref<string[]>([])
 
-const filteredUser = computed(() => {
-  return users.filter(item =>
-    item.username.toLowerCase().includes(search.value.toLowerCase())
-  )
+// meta sederhana buat pagination
+const meta = ref({
+  current_page: 1,
+  per_page: 5,
+  total: 0,
+  last_page: 1,
 })
 
-const paginatedUsers = computed(() => {
-  const start = (page.value - 1) * itemsPerPage.value
-  const end = start + itemsPerPage.value
-  return filteredUser.value.slice(start, end)
-})
+// selection berdasar ID (aman untuk duplikasi nama)
+const selectedRows = ref<number[]>([])
 
-const pageCount = computed(() => Math.ceil(filteredUser.value.length / itemsPerPage.value))
+// dialog detail
+const dialog = ref(false)
+const selectedUser = ref<UserRow | null>(null)
+const newPassword = ref('')
 
-// ✅ Apakah semua baris yang sedang ditampilkan sudah dipilih?
-const allPageSelected = computed(() => {
-  return paginatedUsers.value.every(item => selectedRows.value.includes(item.username))
-})
+// ====== API LOAD ======
+async function fetchUsers() {
+  loading.value = true
+  try {
+    const { data } = await getUsers(token, {
+      page: page.value,
+      per_page: itemsPerPage.value,
+      q: search.value,
+    })
+    rows.value = data.data
+    meta.value = {
+      current_page: data.current_page,
+      per_page: Number(data.per_page),
+      total: data.total,
+      last_page: data.last_page,
+    }
+    page.value = data.current_page
+  } finally {
+    loading.value = false
+  }
+}
 
-// ✅ Toggle select all di halaman aktif
-const toggleSelectAllOnPage = () => {
+// debounce search
+let t: number | undefined
+function onSearchInput() {
+  window.clearTimeout(t)
+  t = window.setTimeout(() => {
+    page.value = 1
+    fetchUsers()
+  }, 400)
+}
+
+onMounted(fetchUsers)
+watch(itemsPerPage, () => { page.value = 1; fetchUsers() })
+watch(page, () => { if (!loading.value) fetchUsers() })
+
+// ====== TABLE HELPERS ======
+const pageCount = computed(() => meta.value.last_page || 1)
+const startNo   = computed(() => (meta.value.current_page - 1) * meta.value.per_page)
+
+// apakah semua baris halaman ini terpilih?
+const allPageSelected = computed(() =>
+  rows.value.length > 0 && rows.value.every(item => selectedRows.value.includes(item.id))
+)
+
+function toggleSelectAllOnPage() {
   if (allPageSelected.value) {
-    // Hapus semua baris di halaman ini dari selectedRows
+    // buang semua id yang ada di halaman ini
     selectedRows.value = selectedRows.value.filter(
-      id => !paginatedUsers.value.some(item => item.username === id)
+      id => !rows.value.some(item => item.id === id)
     )
   } else {
-    // Tambahkan semua baris di halaman ini
-    const toAdd = paginatedUsers.value
-      .map(item => item.username)
+    // tambahkan semua id di halaman ini
+    const toAdd = rows.value
+      .map(item => item.id)
       .filter(id => !selectedRows.value.includes(id))
     selectedRows.value = [...new Set([...selectedRows.value, ...toAdd])]
   }
 }
 
-const toggleSelection = (id: string) => {
+function toggleSelection(id: number) {
   if (selectedRows.value.includes(id)) {
     selectedRows.value = selectedRows.value.filter(i => i !== id)
   } else {
@@ -93,25 +101,70 @@ const toggleSelection = (id: string) => {
   }
 }
 
-const newPassword = ref('')
+// ====== DETAIL DIALOG & ACTIONS ======
+function openDetailDialog(user: UserRow) {
+  selectedUser.value = user
+  dialog.value = true
+}
 
-const updatePassword = () => {
+function updatePassword() {
   if (!newPassword.value) return alert('Password tidak boleh kosong')
-
-  // Lakukan request ke API atau console.log
-  console.log('Update password untuk:', selectedUser.value?.username)
-  console.log('Password baru:', newPassword.value)
-
-  // Tutup dialog dan reset
+  // TODO: panggil endpoint update password /users/{id}/password
+  console.log('Update password untuk:', selectedUser.value?.id, newPassword.value)
   dialog.value = false
   newPassword.value = ''
 }
 
-const goToAddUser = () => {
+function goToAddUser() {
   router.push('/users/add-user')
 }
 
+// state loading untuk tombol delete per item (optional)
+const deletingId = ref<number | null>(null)
+const deleteDialog = ref(false)
+const userToDelete = ref<UserRow | null>(null)
+
+function openDeleteDialog(user: UserRow) {
+  userToDelete.value = user
+  deleteDialog.value = true
+}
+
+async function confirmDelete() {
+  if (!userToDelete.value) return
+  try {
+    deletingId.value = userToDelete.value.id
+    await deleteUser(token, userToDelete.value.id)
+    deleteDialog.value = false
+    userToDelete.value = null
+
+    // kalau terakhir di halaman & masih ada halaman sebelumnya → mundur
+    const isLastItemOnPage = rows.value.length === 1 && page.value > 1
+    if (isLastItemOnPage) {
+      page.value = page.value - 1
+    }
+
+    await fetchUsers()
+  } catch (e: any) {
+    const msg = e?.response?.data?.message || 'Gagal menghapus user.'
+    alert(msg)
+  } finally {
+    deletingId.value = null
+  }
+}
+
+const roleLabel = (role: string) => {
+  const map: Record<string, string> = {
+    admin: 'Admin',
+    viewer: 'Viewer',
+    // tambah kalau ada role lain
+  }
+  return map[role.toLowerCase()] || role
+}
+
+
+
 </script>
+
 
 
 <template>
@@ -134,12 +187,12 @@ const goToAddUser = () => {
         variant="outlined"
         clearable
         style="max-width: 200px"
+        @input="onSearchInput"
       />
-      
     </div>
 
     <!-- Table -->
-    <v-table >
+    <v-table>
       <thead>
         <tr>
           <!-- ✅ Checkbox untuk select all on current page -->
@@ -160,35 +213,30 @@ const goToAddUser = () => {
       </thead>
 
       <tbody>
-        <tr
-          v-for="(item, index) in paginatedUsers"
-          :key="item.username"
-        >
+        <tr v-for="(item, index) in rows" :key="item.id">
           <!-- Row checkbox -->
           <td>
             <v-checkbox
               density="compact"
               hide-details
-              :model-value="selectedRows.includes(item.username)"
-              @click.stop="toggleSelection(item.username)"
+              :model-value="selectedRows.includes(item.id)"
+              @click.stop="toggleSelection(item.id)"
             />
           </td>
-          <td>{{ (page - 1) * itemsPerPage + index + 1 }}</td>
-          <td class="text-center">{{ item.username }}</td>
+          <td>{{ startNo + index + 1 }}</td>
+          <td class="text-center">{{ item.name }}</td>
           <td class="text-center">{{ item.email }}</td>
-            <td class="text-center">{{ item.role }}</td>
+          <td class="text-center">{{ roleLabel(item.role) }}</td>
           <td class="text-center">
             <v-btn
-  icon
-  size="small"
-  variant="text"
-  class="ma-0 pa-0"
-  @click="openDetailDialog(item)"
-  
->
-  <v-icon icon="ri-eye-line" />
-</v-btn>
-
+              icon
+              size="small"
+              variant="text"
+              class="ma-0 pa-0"
+              @click="openDetailDialog(item)"
+            >
+              <v-icon icon="ri-eye-line" />
+            </v-btn>
 
             <v-btn
   icon
@@ -196,78 +244,122 @@ const goToAddUser = () => {
   size="small"
   variant="text"
   class="ma-0 pa-0"
-  
+  :loading="deletingId === item.id"
+  :disabled="deletingId === item.id"
+  @click="openDeleteDialog(item)"
 >
   <v-icon icon="ri-delete-bin-line" />
 </v-btn>
           </td>
         </tr>
 
-        <tr v-if="paginatedUsers.length === 0">
-          <td colspan="5" class="text-center text-disabled">Tidak ada data ditemukan</td>
+        <tr v-if="!loading && rows.length === 0">
+          <td colspan="6" class="text-center text-disabled">Tidak ada data ditemukan</td>
         </tr>
       </tbody>
     </v-table>
-    
+
+    <!-- (opsional) indikator loading -->
+    <v-progress-linear v-if="loading" indeterminate class="mt-2" />
 
     <!-- Pagination + Rows per page -->
-<v-card-actions class="justify-space-between flex-wrap gap-4">
-  <!-- Rows per page -->
-  <div class="d-flex align-center gap-2">
-    <span class="text-caption">Rows per page:</span>
-    <v-select
-      v-model="itemsPerPage"
-      :items="itemsPerPageOptions"
-      variant="outlined"
-      dense
-      hide-details
-      style="max-width: 100px"
-    />
-  </div>
-
-  <!-- Pagination -->
-  <v-pagination
-    v-model="page"
-    :length="pageCount"
-    prev-icon="ri-arrow-left-s-line"
-    next-icon="ri-arrow-right-s-line"
-    total-visible="5"
-    rounded
-  />
-</v-card-actions>
-  </v-card>
-
-  <v-dialog v-model="dialog" max-width="500">
-  <v-card>
-    <v-card-title class="text-h5 my-3 font-weight-bold">
-      Detail User
-    </v-card-title>
-
-    <v-card-text v-if="selectedUser">
-      <div class="mb-3">
-        <p><strong>Username:</strong> {{ selectedUser.username }}</p>
-        <p><strong>Email:</strong> {{ selectedUser.email }}</p>
-        <p><strong>Role:</strong> {{ selectedUser.role }}</p>
+    <v-card-actions class="justify-space-between flex-wrap gap-4">
+      <!-- Rows per page -->
+      <div class="d-flex align-center gap-2">
+        <span class="text-caption">Rows per page:</span>
+        <v-select
+          v-model="itemsPerPage"
+          :items="itemsPerPageOptions"
+          variant="outlined"
+          dense
+          hide-details
+          style="max-width: 100px"
+        />
       </div>
 
-      <v-divider class="my-4" />
-
-      <h4 class="text-subtitle-1 font-weight-medium mb-2">Ubah Password</h4>
-
-      <v-text-field
-        v-model="newPassword"
-        label="Password Baru"
-        type="password"
-        variant="outlined"
-        dense
+      <!-- Pagination -->
+      <v-pagination
+        v-model="page"
+        :length="pageCount"
+        prev-icon="ri-arrow-left-s-line"
+        next-icon="ri-arrow-right-s-line"
+        total-visible="5"
+        rounded
       />
+    </v-card-actions>
+  </v-card>
+
+  <!-- Detail Dialog -->
+  <v-dialog v-model="dialog" max-width="500">
+    <v-card>
+      <v-card-title class="text-h5 my-3 font-weight-bold">
+        Detail User
+      </v-card-title>
+
+      <v-card-text v-if="selectedUser">
+        <div class="mb-3">
+          <p><strong>Username:</strong> {{ selectedUser.name }}</p>
+          <p><strong>Email:</strong> {{ selectedUser.email }}</p>
+          <p><strong>Role:</strong> {{ selectedUser.role }}</p>
+        </div>
+
+        <v-divider class="my-4" />
+
+        <h4 class="text-subtitle-1 font-weight-medium mb-2">Ubah Password</h4>
+
+        <v-text-field
+          v-model="newPassword"
+          label="Password Baru"
+          type="password"
+          variant="outlined"
+          dense
+        />
+      </v-card-text>
+
+      <v-card-actions class="justify-end">
+        <v-btn variant="outlined" @click="dialog = false">Tutup</v-btn>
+        <v-btn variant="flat" color="primary" @click="updatePassword">Simpan</v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+
+
+<v-dialog v-model="deleteDialog" max-width="400">
+  <v-card class="pa-4"> <!-- 👈 tambahkan padding -->
+    <v-card-title class="text-h4 font-weight-bold mb-2">
+      Delete Akun
+    </v-card-title>
+
+    <v-card-text class="mb-2">
+      Anda yakin untuk menghapus akun
+      <strong>{{ userToDelete?.name }}</strong>?
     </v-card-text>
 
-    <v-card-actions class="justify-end">
-      <v-btn variant="outlined" @click="dialog = false">Tutup</v-btn>
-      <v-btn variant="flat" color="primary" @click="updatePassword">Simpan</v-btn>
+    <v-card-actions class="justify-end gap-2">
+      <v-btn
+        variant="outlined"
+        class="flex-1"
+        min-width="100"
+        @click="deleteDialog = false"
+      >
+        No
+      </v-btn>
+
+      <v-btn
+        variant="flat"
+        color="error"
+        class="flex-1"
+        min-width="100"
+        :loading="deletingId === userToDelete?.id"
+        :disabled="deletingId === userToDelete?.id"
+        @click="confirmDelete"
+      >
+        Yes
+      </v-btn>
     </v-card-actions>
   </v-card>
 </v-dialog>
 
 </template>
+

@@ -15,45 +15,36 @@ const kematianList = [
   { nik: '3201010101010005', nama: 'Agus Prabowo', tanggal_kematian: '2025-03-12', nomor_akta: 'AKM-005' },
 ]
 
-// Filter bulan (otomatis dari Intl)
-const bulanFilter = ref('')
-const bulanOptions = [
-  { text: 'Semua', value: '' },
-  ...Array.from({ length: 12 }, (_, i) => ({
-    text: new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(new Date(2000, i, 1)),
-    value: String(i + 1).padStart(2, '0')
-  }))
-]
+// Date range filter
+const startDate = ref<string | null>(null)
+const endDate = ref<string | null>(null)
 
+// Export Excel
 const exportExcel = () => {
   let exportData
-
   if (selectedRows.value.length > 0) {
-    // Ambil data berdasarkan NIK yang tercentang
     exportData = kematianList.filter(item => selectedRows.value.includes(item.nik))
   } else {
-    // Kalau tidak ada yang dicentang, ambil hasil filter bulan & search
     exportData = filteredData.value
   }
-
-  // Buat workbook dan worksheet
   const wb = XLSX.utils.book_new()
   const ws = XLSX.utils.json_to_sheet(exportData)
-
-  // Masukkan worksheet ke workbook
   XLSX.utils.book_append_sheet(wb, ws, "Data Kematian")
-
-  // Simpan sebagai file Excel
   XLSX.writeFile(wb, "data_kematian.xlsx")
 }
-
-
 
 // Pagination & search
 const page = ref(1)
 const itemsPerPage = ref(5)
 const itemsPerPageOptions = [5, 10, 50, 100]
 const search = ref('')
+
+// Reset Filter
+const resetFilter = () => {
+  search.value = ''
+  startDate.value = null
+  endDate.value = null
+}
 
 // Checkbox selection
 const selectedRows = ref<string[]>([])
@@ -65,11 +56,12 @@ const filteredData = computed(() => {
       item.nama.toLowerCase().includes(search.value.toLowerCase()) ||
       item.nik.includes(search.value)
 
-    const matchMonth =
-      !bulanFilter.value ||
-      item.tanggal_kematian.slice(5, 7) === bulanFilter.value
+    const itemDate = new Date(item.tanggal_kematian)
+    const matchDate =
+      (!startDate.value || itemDate >= new Date(startDate.value)) &&
+      (!endDate.value || itemDate <= new Date(endDate.value))
 
-    return matchSearch && matchMonth
+    return matchSearch && matchDate
   })
 })
 
@@ -113,26 +105,21 @@ const goToAddData = () => {
 
 <template>
   <!-- Title & Add Button -->
-<div class="d-flex justify-space-between align-center mb-4">
-  <!-- Kolom kiri: Title -->
-  <div>
+  <div class="d-flex justify-space-between align-center mb-4">
     <h3 class="text-h3 font-weight-bold">Data Kematian</h3>
+    <div class="d-flex align-center">
+      <v-btn @click="goToAddData" color="primary" variant="flat" class="mr-2">
+        <v-icon class="ri-add-line mr-1" /> Tambah Data
+      </v-btn>
+      <v-btn color="success" @click="exportExcel">
+        Export Excel
+      </v-btn>
+    </div>
   </div>
-
-  <!-- Kolom kanan: Tombol -->
-  <div class="d-flex align-center">
-    <v-btn @click="goToAddData" color="primary" variant="flat" class="mr-2">
-      <v-icon class="ri-add-line mr-1" /> Tambah Data
-    </v-btn>
-    <v-btn color="success" @click="exportExcel">
-      Export Excel
-    </v-btn>
-  </div>
-</div>
 
   <!-- Card -->
   <v-card elevation="4" class="pa-4">
-    <!-- Search & Filter -->
+    <!-- Search & Date Filter -->
     <div class="mb-4 d-flex gap-4 flex-wrap">
       <v-text-field
         v-model="search"
@@ -144,17 +131,37 @@ const goToAddData = () => {
         clearable
         style="max-width: 250px"
       />
-      <v-select
-          v-model="bulanFilter"
-          :items="bulanOptions"
-          item-title="text"
-          item-value="value"
-          label="Filter Bulan"
-          variant="outlined"
-          dense
-          hide-details
-          style="max-width: 200px"
-        />
+
+      <v-text-field
+        v-model="startDate"
+        type="date"
+        label="Tanggal Awal"
+        variant="outlined"
+        dense
+        hide-details
+        style="max-width: 200px"
+      />
+
+      <v-text-field
+        v-model="endDate"
+        type="date"
+        label="Tanggal Akhir"
+        variant="outlined"
+        dense
+        hide-details
+        style="max-width: 200px"
+      />
+
+      <!-- Tombol Reset -->
+  <v-btn
+  color="secondary"
+  variant="text"
+  @click="resetFilter"
+  class="d-flex align-center"
+  style="height: 50px; min-width: 50px;"
+>
+  Reset Filter
+</v-btn>
     </div>
 
     <!-- Table -->
