@@ -50,6 +50,16 @@ export const routes = [
         component: () => import('@/views/adminView/AddAktaPindah.vue'),
         meta: { requiresAuth: true },
       },
+      {
+        path: 'aktakematian/:id/edit',
+        component: () => import('@/views/adminView/EditAktaKematian.vue'),
+        meta: { requiresAuth: true },
+      },
+      {
+        path: 'aktapindah/:id/edit',
+        component: () => import('@/views/adminView/EditAktaPindah.vue'),
+        meta: { requiresAuth: true },
+      },
 
       // sisanya kalau memang private juga kasih requiresAuth
       { path: 'account-settings', component: () => import('@/pages/account-settings.vue'), meta: { requiresAuth: true } },

@@ -26,64 +26,73 @@
       <v-form @submit.prevent="submitForm" class="space-y-4">
 
         <!-- NIK -->
-        <v-text-field
-          class="mb-4"
-          v-model="form.nik"
-          label="NIK"
-          placeholder="Masukkan NIK"
-          outlined
-          dense
-          required
-        />
+<v-text-field
+  class="mb-4"
+  v-model="form.nik"
+  label="NIK"
+  placeholder="Masukkan NIK"
+  outlined
+  dense
+  :error="!!errors.nik"
+  :error-messages="errors.nik"
+  required
+/>
 
-        <!-- Nama Lengkap -->
-        <v-text-field
-        class="mb-4"
-          v-model="form.nama_lengkap"
-          label="Nama Lengkap"
-          placeholder="Masukkan nama lengkap"
-          outlined
-          dense
-          required
-        />
-        
+<!-- Nama Lengkap -->
+<v-text-field
+  class="mb-4"
+  v-model="form.nama_lengkap"
+  label="Nama Lengkap"
+  placeholder="Masukkan nama lengkap"
+  outlined
+  dense
+  :error="!!errors.nama_lengkap"
+  :error-messages="errors.nama_lengkap"
+  required
+/>
 
-        <!-- Tanggal Kematian -->
-        <v-text-field
-        class="mb-4"
-          v-model="form.tanggal_kematian"
-          label="Tanggal Kematian"
-          type="date"
-          outlined
-          dense
-          required
-        />
+<!-- Tanggal Kematian -->
+<v-text-field
+  class="mb-4"
+  v-model="form.tanggal_kematian"
+  label="Tanggal Kematian"
+  type="date"
+  outlined
+  dense
+  :error="!!errors.tanggal_kematian"
+  :error-messages="errors.tanggal_kematian"
+  required
+/>
 
-        <!-- Nomor Akta -->
-        <v-text-field
-        class="mb-4"
-          v-model="form.nomor_akta"
-          label="Nomor Akta"
-          placeholder="Masukkan nomor akta"
-          outlined
-          dense
-          required
-        />
+<!-- Nomor Akta -->
+<v-text-field
+  class="mb-4"
+  v-model="form.nomor_akta"
+  label="Nomor Akta"
+  placeholder="Masukkan nomor akta"
+  outlined
+  dense
+  :error="!!errors.nomor_akta"
+  :error-messages="errors.nomor_akta"
+/>
 
-        <!-- Tombol Simpan -->
-        <v-btn type="submit" color="primary" class="mt-4">
-          Simpan
-        </v-btn>
+<!-- Tombol Simpan -->
+<v-btn type="submit" color="primary" class="mt-4" :loading="loading" :disabled="loading">
+  Simpan
+</v-btn>
+
       </v-form>
     </v-card>
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import { createKematian } from '@/api/kematian'
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 
-const router = useRouter() // ✅ panggil router
-
+const router = useRouter()
+const token = localStorage.getItem('token') || ''
 
 const form = ref({
   nik: '',
@@ -92,12 +101,58 @@ const form = ref({
   nomor_akta: '',
 })
 
-const submitForm = () => {
-  console.log('Data form:', form.value)
-  // Nanti di sini bisa panggil API Laravel pakai axios
+const loading = ref(false)
+const errors = ref<Record<string, string[]>>({})
+
+function clearErrors() {
+  errors.value = {}
 }
 
-const goBack = () => {
+async function submitForm() {
+  clearErrors()
+
+  // validasi sederhana di client
+  if (!form.value.nik || !form.value.nama_lengkap || !form.value.tanggal_kematian || !form.value.nomor_akta) {
+    const missing: string[] = []
+    if (!form.value.nik) missing.push('NIK')
+    if (!form.value.nama_lengkap) missing.push('Nama Lengkap')
+    if (!form.value.tanggal_kematian) missing.push('Tanggal Kematian')
+    if (!form.value.nomor_akta) missing.push('Nomor Akta')
+    alert(`Harap isi: ${missing.join(', ')}`)
+    return
+  }
+
+  loading.value = true
+  try {
+    await createKematian(token, {
+      nik: form.value.nik,
+      nama_lengkap: form.value.nama_lengkap,
+      tanggal_kematian: form.value.tanggal_kematian, // yyyy-mm-dd
+      nomor_akta: form.value.nomor_akta,
+    })
+    // sukses → kembali ke list
+    router.push('/aktakematian')
+  } catch (e: any) {
+    // 401: token invalid → arahkan ke login (opsional)
+    if (e?.response?.status === 401) {
+      alert('Sesi habis. Silakan login kembali.')
+      router.push('/login')
+      return
+    }
+    // 422 validation dari Laravel
+    const ve = e?.response?.data?.errors
+    if (ve && typeof ve === 'object') {
+      errors.value = ve
+    } else {
+      const msg = e?.response?.data?.message || 'Gagal menyimpan data.'
+      alert(msg)
+    }
+  } finally {
+    loading.value = false
+  }
+}
+
+function goBack() {
   router.back()
 }
 </script>

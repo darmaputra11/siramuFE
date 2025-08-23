@@ -1,107 +1,171 @@
 <script lang="ts" setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 // @ts-ignore
-import * as XLSX from "xlsx"
+import type { KematianRow } from '@/api/kematian'
+import { deleteKematian, getKematian } from '@/api/kematian'
+import * as XLSX from 'xlsx'
 
 const router = useRouter()
+const token = localStorage.getItem('token') || ''
 
-// Contoh data kematian
-const kematianList = [
-  { nik: '3201010101010001', nama: 'Budi Santoso', tanggal_kematian: '2025-01-15', nomor_akta: 'AKM-001' },
-  { nik: '3201010101010002', nama: 'Siti Aminah', tanggal_kematian: '2025-02-01', nomor_akta: 'AKM-002' },
-  { nik: '3201010101010003', nama: 'Andi Wijaya', tanggal_kematian: '2025-02-10', nomor_akta: 'AKM-003' },
-  { nik: '3201010101010004', nama: 'Dewi Lestari', tanggal_kematian: '2025-03-05', nomor_akta: 'AKM-004' },
-  { nik: '3201010101010005', nama: 'Agus Prabowo', tanggal_kematian: '2025-03-12', nomor_akta: 'AKM-005' },
-]
+// ====== STATE WAJIB (supaya tidak undefined) ======
+const rows = ref<KematianRow[]>([])      // <-- inisialisasi array kosong
 
-// Date range filter
-const startDate = ref<string | null>(null)
-const endDate = ref<string | null>(null)
+const safeRows = computed<KematianRow[]>(() =>
+  Array.isArray(rows.value) ? rows.value : []
+)
 
-// Export Excel
-const exportExcel = () => {
-  let exportData
-  if (selectedRows.value.length > 0) {
-    exportData = kematianList.filter(item => selectedRows.value.includes(item.nik))
-  } else {
-    exportData = filteredData.value
-  }
-  const wb = XLSX.utils.book_new()
-  const ws = XLSX.utils.json_to_sheet(exportData)
-  XLSX.utils.book_append_sheet(wb, ws, "Data Kematian")
-  XLSX.writeFile(wb, "data_kematian.xlsx")
-}
+const loading = ref(false)
 
-// Pagination & search
 const page = ref(1)
 const itemsPerPage = ref(5)
 const itemsPerPageOptions = [5, 10, 50, 100]
 const search = ref('')
 
-// Reset Filter
-const resetFilter = () => {
+const startDate = ref<string | null>(null)
+const endDate = ref<string | null>(null)
+
+const meta = ref({
+  current_page: 1,
+  per_page: 5,
+  total: 0,
+  last_page: 1,
+})
+
+// ====== FETCH API ======
+async function fetchKematian() {
+  loading.value = true
+  try {
+    const { data } = await getKematian(token, {
+      page: page.value,
+      per_page: itemsPerPage.value,
+      q: search.value || undefined,
+      start_date: startDate.value || undefined,
+      end_date: endDate.value || undefined,
+      sort: 'oldest',
+    })
+    rows.value = data.data
+    meta.value = {
+      current_page: data.current_page,
+      per_page: Number(data.per_page),
+      total: data.total,
+      last_page: data.last_page,
+    }
+    page.value = data.current_page
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(fetchKematian)
+
+// debounce input
+let t: number | undefined
+function triggerFetchDebounced() {
+  window.clearTimeout(t)
+  t = window.setTimeout(() => {
+    page.value = 1
+    fetchKematian()
+  }, 400)
+}
+
+watch(itemsPerPage, () => { page.value = 1; fetchKematian() })
+watch(page, () => { if (!loading.value) fetchKematian() })
+
+// state untuk modal delete
+const deleteDialog = ref(false)
+const itemToDelete = ref<KematianRow | null>(null)
+const deletingId = ref<number | null>(null)
+
+function openDeleteDialog(item: KematianRow) {
+  itemToDelete.value = item
+  deleteDialog.value = true
+}
+
+async function confirmDelete() {
+  if (!itemToDelete.value) return
+  try {
+    deletingId.value = itemToDelete.value.id
+    await deleteKematian(token, itemToDelete.value.id)
+
+    // tutup dialog & reset
+    deleteDialog.value = false
+    itemToDelete.value = null
+
+    // jika ini item terakhir di halaman & masih ada halaman sebelumnya → mundur
+    const isLastItemOnPage = safeRows.value.length === 1 && page.value > 1
+    if (isLastItemOnPage) page.value = page.value - 1
+
+    await fetchKematian()
+  } catch (e: any) {
+    const msg = e?.response?.data?.message || 'Gagal menghapus data.'
+    alert(msg)
+  } finally {
+    deletingId.value = null
+  }
+}
+
+
+// ====== TABLE HELPERS ======
+const pageCount = computed(() => meta.value.last_page || 1)
+const startNo   = computed(() => (meta.value.current_page - 1) * meta.value.per_page)
+
+// selection per halaman (pakai NIK)
+const selectedRows = ref<string[]>([])
+const allPageSelected = computed(() => safeRows.value.length > 0 &&
+  safeRows.value.every(r => selectedRows.value.includes(r.nik))
+)
+
+function toggleSelectAllOnPage() {
+  if (allPageSelected.value) {
+    selectedRows.value = selectedRows.value.filter(nik => !safeRows.value.some(r => r.nik === nik))
+  } else {
+    const add = safeRows.value.map(r => r.nik).filter(nik => !selectedRows.value.includes(nik))
+    selectedRows.value = [...selectedRows.value, ...add]
+  }
+}
+function toggleSelection(nik: string) {
+  selectedRows.value = selectedRows.value.includes(nik)
+    ? selectedRows.value.filter(n => n !== nik)
+    : [...selectedRows.value, nik]
+}
+
+// reset filter
+function resetFilter() {
   search.value = ''
   startDate.value = null
   endDate.value = null
+  page.value = 1
+  fetchKematian()
 }
 
-// Checkbox selection
-const selectedRows = ref<string[]>([])
+// export excel
+function exportExcel() {
+  const dataToExport = selectedRows.value.length
+    ? rows.value.filter(r => selectedRows.value.includes(r.nik))
+    : rows.value
 
-// Filtered data
-const filteredData = computed(() => {
-  return kematianList.filter(item => {
-    const matchSearch =
-      item.nama.toLowerCase().includes(search.value.toLowerCase()) ||
-      item.nik.includes(search.value)
+  const exportData = dataToExport.map(r => ({
+    NIK: r.nik,
+    'Nama Lengkap': r.nama_lengkap,
+    'Tanggal Kematian': r.tanggal_kematian,
+    'Nomor Akta': r.nomor_akta,
+  }))
 
-    const itemDate = new Date(item.tanggal_kematian)
-    const matchDate =
-      (!startDate.value || itemDate >= new Date(startDate.value)) &&
-      (!endDate.value || itemDate <= new Date(endDate.value))
-
-    return matchSearch && matchDate
-  })
-})
-
-const paginatedData = computed(() => {
-  const start = (page.value - 1) * itemsPerPage.value
-  return filteredData.value.slice(start, start + itemsPerPage.value)
-})
-
-const pageCount = computed(() => Math.ceil(filteredData.value.length / itemsPerPage.value))
-
-const allPageSelected = computed(() => {
-  return paginatedData.value.every(item => selectedRows.value.includes(item.nik))
-})
-
-const toggleSelectAllOnPage = () => {
-  if (allPageSelected.value) {
-    selectedRows.value = selectedRows.value.filter(
-      id => !paginatedData.value.some(item => item.nik === id)
-    )
-  } else {
-    const toAdd = paginatedData.value
-      .map(item => item.nik)
-      .filter(id => !selectedRows.value.includes(id))
-    selectedRows.value = [...selectedRows.value, ...toAdd]
-  }
+  const wb = XLSX.utils.book_new()
+  const ws = XLSX.utils.json_to_sheet(exportData)
+  XLSX.utils.book_append_sheet(wb, ws, 'Data Kematian')
+  XLSX.writeFile(wb, 'data_kematian.xlsx')
 }
 
-const toggleSelection = (id: string) => {
-  if (selectedRows.value.includes(id)) {
-    selectedRows.value = selectedRows.value.filter(i => i !== id)
-  } else {
-    selectedRows.value.push(id)
-  }
-}
-
-// Action
-const goToAddData = () => {
+// nav
+function goToAddData() {
   router.push('/aktakematian/create')
 }
 </script>
+
+
 
 <template>
   <!-- Title & Add Button -->
@@ -130,6 +194,7 @@ const goToAddData = () => {
         variant="outlined"
         clearable
         style="max-width: 250px"
+        @input="triggerFetchDebounced"
       />
 
       <v-text-field
@@ -140,6 +205,7 @@ const goToAddData = () => {
         dense
         hide-details
         style="max-width: 200px"
+        @update:model-value="triggerFetchDebounced"
       />
 
       <v-text-field
@@ -150,18 +216,19 @@ const goToAddData = () => {
         dense
         hide-details
         style="max-width: 200px"
+        @update:model-value="triggerFetchDebounced"
       />
 
       <!-- Tombol Reset -->
-  <v-btn
-  color="secondary"
-  variant="text"
-  @click="resetFilter"
-  class="d-flex align-center"
-  style="height: 50px; min-width: 50px;"
->
-  Reset Filter
-</v-btn>
+      <v-btn
+        color="secondary"
+        variant="text"
+        @click="resetFilter"
+        class="d-flex align-center"
+        style="height: 50px; min-width: 50px;"
+      >
+        Reset Filter
+      </v-btn>
     </div>
 
     <!-- Table -->
@@ -186,7 +253,7 @@ const goToAddData = () => {
       </thead>
 
       <tbody>
-        <tr v-for="(item, index) in paginatedData" :key="item.nik">
+        <tr v-for="(item, index) in safeRows" :key="item.id ?? item.nik">
           <td>
             <v-checkbox
               density="compact"
@@ -195,26 +262,44 @@ const goToAddData = () => {
               @click.stop="toggleSelection(item.nik)"
             />
           </td>
-          <td>{{ (page - 1) * itemsPerPage + index + 1 }}</td>
+          <td>{{ startNo + index + 1 }}</td>
           <td class="text-center">{{ item.nik }}</td>
-          <td class="text-center">{{ item.nama }}</td>
+          <td class="text-center">{{ item.nama_lengkap }}</td>
           <td class="text-center">{{ item.tanggal_kematian }}</td>
           <td class="text-center">{{ item.nomor_akta }}</td>
           <td class="text-center">
-            <v-btn icon size="small" variant="text" color="primary">
-              <v-icon class="ri-edit-box-line" />
-            </v-btn>
-            <v-btn icon size="small" variant="text" color="error">
-              <v-icon class="ri-delete-bin-line" />
-            </v-btn>
+            <v-btn
+  icon
+  size="small"
+  variant="text"
+  color="primary"
+  @click="router.push(`/aktakematian/${item.id}/edit`)"
+>
+  <v-icon class="ri-edit-box-line" />
+</v-btn>
+           <v-btn
+  icon
+  size="small"
+  variant="text"
+  color="error"
+  class="ma-0 pa-0"
+  :loading="deletingId === item.id"
+  :disabled="deletingId === item.id"
+  @click="openDeleteDialog(item)"
+>
+  <v-icon class="ri-delete-bin-line" />
+</v-btn>
           </td>
         </tr>
 
-        <tr v-if="paginatedData.length === 0">
+        <tr v-if="!loading && safeRows.length === 0">
           <td colspan="7" class="text-center text-disabled">Tidak ada data ditemukan</td>
         </tr>
       </tbody>
     </v-table>
+
+    <!-- Loading indicator -->
+    <v-progress-linear v-if="loading" indeterminate class="mt-2" />
 
     <!-- Pagination -->
     <v-card-actions class="justify-space-between flex-wrap gap-4">
@@ -240,4 +325,41 @@ const goToAddData = () => {
       />
     </v-card-actions>
   </v-card>
+  <v-dialog v-model="deleteDialog" max-width="420">
+  <v-card class="pa-4">
+    <v-card-title class="text-h6 font-weight-bold mb-2">
+      Delete Data
+    </v-card-title>
+
+    <v-card-text class="mb-4">
+      Anda yakin untuk menghapus data akta kematian
+      <strong>{{ itemToDelete?.nama_lengkap }}</strong> (NIK {{ itemToDelete?.nik }})?
+    </v-card-text>
+
+    <v-card-actions class="justify-end gap-2">
+      <v-btn
+        variant="outlined"
+        class="flex-1"
+        min-width="110"
+        @click="deleteDialog = false"
+      >
+        No
+      </v-btn>
+
+      <v-btn
+        variant="flat"
+        color="error"
+        class="flex-1"
+        min-width="110"
+        :loading="deletingId === itemToDelete?.id"
+        :disabled="deletingId === itemToDelete?.id"
+        @click="confirmDelete"
+      >
+        Yes
+      </v-btn>
+    </v-card-actions>
+  </v-card>
+</v-dialog>
+
 </template>
+

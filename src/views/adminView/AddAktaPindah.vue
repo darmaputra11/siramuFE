@@ -26,89 +26,122 @@
       <v-form @submit.prevent="submitForm" class="space-y-4">
         
         <!-- NIK -->
-        <v-text-field
-          class="mb-4"
-          v-model="form.nik"
-          label="NIK"
-          placeholder="Masukkan NIK"
-          outlined
-          dense
-          required
-        />
+<v-text-field
+  class="mb-4"
+  v-model="form.nik"
+  label="NIK"
+  outlined dense required
+  :error="!!errors.nik" :error-messages="errors.nik"
+/>
 
-        <!-- Nama Lengkap -->
-        <v-text-field
-          class="mb-4"
-          v-model="form.nama_lengkap"
-          label="Nama Lengkap"
-          placeholder="Masukkan nama lengkap"
-          outlined
-          dense
-          required
-        />
+<!-- Nama Lengkap -->
+<v-text-field
+  class="mb-4"
+  v-model="form.nama_lengkap"
+  label="Nama Lengkap"
+  outlined dense required
+  :error="!!errors.nama_lengkap" :error-messages="errors.nama_lengkap"
+/>
 
-        <!-- Nomor KK -->
-        <v-text-field
-          class="mb-4"
-          v-model="form.no_kk"
-          label="Nomor KK"
-          placeholder="Masukkan nomor KK"
-          outlined
-          dense
-          required
-        />
+<!-- Nomor KK -->
+<v-text-field
+  class="mb-4"
+  v-model="form.nomor_kk" 
+  label="Nomor KK"
+  outlined dense required
+  :error="!!errors.nomor_kk" :error-messages="errors.nomor_kk"
+/>
 
-        <!-- Nomor Pindah -->
-        <v-text-field
-          class="mb-4"
-          v-model="form.nomor_pindah"
-          label="Nomor Pindah"
-          placeholder="Masukkan nomor pindah"
-          outlined
-          dense
-          required
-        />
+<!-- Nomor Pindah -->
+<v-text-field
+  class="mb-4"
+  v-model="form.nomor_pindah"
+  label="Nomor Pindah"
+  outlined dense required
+  :error="!!errors.nomor_pindah" :error-messages="errors.nomor_pindah"
+/>
 
-        <!-- Tanggal Pindah -->
-        <v-text-field
-          class="mb-4"
-          v-model="form.tanggal_pindah"
-          label="Tanggal Pindah"
-          type="date"
-          outlined
-          dense
-          required
-        />
+<!-- Tanggal Pindah -->
+<v-text-field
+  class="mb-4"
+  v-model="form.tanggal_pindah"
+  label="Tanggal Pindah"
+  type="date" outlined dense required
+  :error="!!errors.tanggal_pindah" :error-messages="errors.tanggal_pindah"
+/>
 
-        <!-- Tombol Simpan -->
-        <v-btn type="submit" color="primary" class="mt-4">
-          Simpan
-        </v-btn>
+<!-- Tombol Simpan -->
+<v-btn type="submit" color="primary" class="mt-4" :loading="loading" :disabled="loading">
+  Simpan
+</v-btn>
       </v-form>
     </v-card>
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import { createPindah } from '@/api/pindah'
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
+const token = localStorage.getItem('token') || ''
 
 const form = ref({
   nik: '',
   nama_lengkap: '',
-  no_kk: '',
+  nomor_kk: '',        // <-- ganti no_kk -> nomor_kk
   nomor_pindah: '',
-  tanggal_pindah: ''
+  tanggal_pindah: '',
 })
 
-const submitForm = () => {
-  console.log('Data form:', form.value)
-  // Nanti di sini bisa panggil API Laravel pakai axios
+const loading = ref(false)
+const errors = ref<Record<string, string[]>>({})
+
+function clearErrors() { errors.value = {} }
+
+async function submitForm() {
+  clearErrors()
+
+  // validasi ringan di client
+  const missing: string[] = []
+  if (!form.value.nik) missing.push('NIK')
+  if (!form.value.nama_lengkap) missing.push('Nama Lengkap')
+  if (!form.value.nomor_kk) missing.push('Nomor KK')
+  if (!form.value.nomor_pindah) missing.push('Nomor Pindah')
+  if (!form.value.tanggal_pindah) missing.push('Tanggal Pindah')
+  if (missing.length) {
+    alert(`Harap isi: ${missing.join(', ')}`)
+    return
+  }
+
+  loading.value = true
+  try {
+    await createPindah(token, {
+      nik: form.value.nik,
+      nama_lengkap: form.value.nama_lengkap,
+      nomor_kk: form.value.nomor_kk,
+      nomor_pindah: form.value.nomor_pindah,
+      tanggal_pindah: form.value.tanggal_pindah, // yyyy-mm-dd
+    })
+    router.push('/aktapindah') // kembali ke list
+  } catch (e: any) {
+    if (e?.response?.status === 401) {
+      alert('Sesi habis. Silakan login kembali.')
+      router.push('/login')
+      return
+    }
+    const ve = e?.response?.data?.errors
+    if (ve && typeof ve === 'object') {
+      errors.value = ve               // tampilkan error per-field
+    } else {
+      alert(e?.response?.data?.message || 'Gagal menyimpan data.')
+    }
+  } finally {
+    loading.value = false
+  }
 }
 
-const goBack = () => {
-  router.back()
-}
+function goBack() { router.back() }
 </script>
+
