@@ -1,14 +1,25 @@
 <script setup lang="ts">
+import { logoutApi } from "@/api/auth"
+import { clearAuth } from "@/utils/AuthStorage"
 import avatar1 from '@images/avatars/avatar-1.png'
 import { useRouter } from "vue-router"
 
 const router = useRouter()
 
-const handleLogout = () => {
-  localStorage.removeItem('token')
-  localStorage.removeItem('user')
-  console.log('✅ Token & user cleared')
-  router.replace('/login')
+const handleLogout = async () => {
+  try {
+    // panggil backend untuk revoke refresh token & hapus cookie rt
+    await logoutApi()
+  } catch (e) {
+    console.warn("Logout API error (ignored):", e)
+  } finally {
+    // hapus token/user di storage (localStorage/sessionStorage)
+    clearAuth()
+    console.log("✅ Auth cleared (token, user, remember)")
+
+    // redirect ke login
+    router.replace("/login")
+  }
 }
 </script>
 

@@ -1,7 +1,5 @@
 // src/api/kematian.ts
-import axios from "axios"
-
-const API_URL = "http://127.0.0.1:8000/api"
+import http from "@/api/http"
 
 export interface KematianRow {
   id: number
@@ -13,7 +11,7 @@ export interface KematianRow {
   updated_at?: string
 }
 
-// mengikuti paginator default Laravel
+// Paginator default Laravel
 export interface KematianResponse {
   current_page: number
   data: KematianRow[]
@@ -22,53 +20,41 @@ export interface KematianResponse {
   last_page: number
 }
 
-export const getKematian = async (
-  token: string,
-  params: {
-    page?: number
-    per_page?: number
-    q?: string
-    start_date?: string // yyyy-mm-dd
-    end_date?: string   // yyyy-mm-dd
-    sort?: "oldest" | "newest"
-  } = {}
-) => {
-  return await axios.get<KematianResponse>(`${API_URL}/kematian`, {
-    params,
-    headers: { Authorization: `Bearer ${token}` },
-  })
+export interface KematianQuery {
+  page?: number
+  per_page?: number
+  q?: string
+  start_date?: string // yyyy-mm-dd
+  end_date?: string   // yyyy-mm-dd
+  sort?: "oldest" | "newest"
 }
 
-export const deleteKematian = async (token: string, id: number) => {
-  return await axios.delete(`${API_URL}/kematian/${id}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
+export const getKematian = (params: KematianQuery = {}) => {
+  return http.get<KematianResponse>("/kematian", { params })
 }
 
-export const createKematian = async (token: string, payload: {
+export const getKematianById = (id: number) => {
+  return http.get<KematianRow>(`/kematian/${id}`)
+}
+
+export const createKematian = (payload: {
   nik: string
   nama_lengkap: string
   tanggal_kematian: string
   nomor_akta: string
 }) => {
-  return await axios.post(`${API_URL}/kematian`, payload, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
+  return http.post("/kematian", payload)
 }
 
-export const getKematianById = async (token: string, id: number) => {
-  return await axios.get<KematianRow>(`${API_URL}/kematian/${id}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-}
-
-export const updateKematian = async (token: string, id: number, payload: {
+export const updateKematian = (id: number, payload: {
   nik: string
   nama_lengkap: string
   tanggal_kematian: string
   nomor_akta: string
 }) => {
-  return await axios.put(`${API_URL}/kematian/${id}`, payload, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
+  return http.put(`/kematian/${id}`, payload)
+}
+
+export const deleteKematian = (id: number) => {
+  return http.delete(`/kematian/${id}`)
 }

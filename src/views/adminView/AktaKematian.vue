@@ -1,22 +1,16 @@
 <script lang="ts" setup>
+import type { KematianResponse, KematianRow } from '@/api/kematian'
+import { deleteKematian, getKematian } from '@/api/kematian'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-// @ts-ignore
-import type { KematianRow } from '@/api/kematian'
-import { deleteKematian, getKematian } from '@/api/kematian'
 import * as XLSX from 'xlsx'
 
 const router = useRouter()
-const token = localStorage.getItem('token') || ''
 
-// ====== STATE WAJIB (supaya tidak undefined) ======
-const rows = ref<KematianRow[]>([])      // <-- inisialisasi array kosong
-
-const safeRows = computed<KematianRow[]>(() =>
-  Array.isArray(rows.value) ? rows.value : []
-)
-
+// ====== STATE ======
+const rows = ref<KematianRow[]>([])
 const loading = ref(false)
+const errorMsg = ref('')
 
 const page = ref(1)
 const itemsPerPage = ref(5)
@@ -24,7 +18,7 @@ const itemsPerPageOptions = [5, 10, 50, 100]
 const search = ref('')
 
 const startDate = ref<string | null>(null)
-const endDate = ref<string | null>(null)
+const endDate   = ref<string | null>(null)
 
 const meta = ref({
   current_page: 1,
@@ -33,11 +27,15 @@ const meta = ref({
   last_page: 1,
 })
 
+// aman terhadap undefined
+const safeRows = computed<KematianRow[]>(() => Array.isArray(rows.value) ? rows.value : [])
+
 // ====== FETCH API ======
 async function fetchKematian() {
   loading.value = true
+  errorMsg.value = ''
   try {
-    const { data } = await getKematian(token, {
+    const { data } = await getKematian({
       page: page.value,
       per_page: itemsPerPage.value,
       q: search.value || undefined,
@@ -45,6 +43,8 @@ async function fetchKematian() {
       end_date: endDate.value || undefined,
       sort: 'oldest',
     })
+    console.log('[Kematian] loaded:', data as KematianResponse)
+
     rows.value = data.data
     meta.value = {
       current_page: data.current_page,
@@ -53,6 +53,9 @@ async function fetchKematian() {
       last_page: data.last_page,
     }
     page.value = data.current_page
+  } catch (e: any) {
+    console.error('[Kematian] fetch error:', e?.response || e)
+    errorMsg.value = e?.response?.data?.message || e?.message || 'Gagal memuat data'
   } finally {
     loading.value = false
   }
@@ -70,51 +73,14 @@ function triggerFetchDebounced() {
   }, 400)
 }
 
+// watchers rapi
 watch(itemsPerPage, () => { page.value = 1; fetchKematian() })
-watch(page, () => { if (!loading.value) fetchKematian() })
+watch(page, (nv, ov) => { if (nv !== ov && !loading.value) fetchKematian() })
 
-// state untuk modal delete
-const deleteDialog = ref(false)
-const itemToDelete = ref<KematianRow | null>(null)
-const deletingId = ref<number | null>(null)
-
-function openDeleteDialog(item: KematianRow) {
-  itemToDelete.value = item
-  deleteDialog.value = true
-}
-
-async function confirmDelete() {
-  if (!itemToDelete.value) return
-  try {
-    deletingId.value = itemToDelete.value.id
-    await deleteKematian(token, itemToDelete.value.id)
-
-    // tutup dialog & reset
-    deleteDialog.value = false
-    itemToDelete.value = null
-
-    // jika ini item terakhir di halaman & masih ada halaman sebelumnya → mundur
-    const isLastItemOnPage = safeRows.value.length === 1 && page.value > 1
-    if (isLastItemOnPage) page.value = page.value - 1
-
-    await fetchKematian()
-  } catch (e: any) {
-    const msg = e?.response?.data?.message || 'Gagal menghapus data.'
-    alert(msg)
-  } finally {
-    deletingId.value = null
-  }
-}
-
-
-// ====== TABLE HELPERS ======
-const pageCount = computed(() => meta.value.last_page || 1)
-const startNo   = computed(() => (meta.value.current_page - 1) * meta.value.per_page)
-
-// selection per halaman (pakai NIK)
-const selectedRows = ref<string[]>([])
-const allPageSelected = computed(() => safeRows.value.length > 0 &&
-  safeRows.value.every(r => selectedRows.value.includes(r.nik))
+// ====== SELECTION ======
+const selectedRows = ref<string[]>([]) // pakai NIK
+const allPageSelected = computed(() =>
+  safeRows.value.length > 0 && safeRows.value.every(r => selectedRows.value.includes(r.nik))
 )
 
 function toggleSelectAllOnPage() {
@@ -163,9 +129,40 @@ function exportExcel() {
 function goToAddData() {
   router.push('/aktakematian/create')
 }
+
+// ====== DELETE DIALOG ======
+const deleteDialog = ref(false)
+const itemToDelete = ref<KematianRow | null>(null)
+const deletingId = ref<number | null>(null)
+
+function openDeleteDialog(item: KematianRow) {
+  itemToDelete.value = item
+  deleteDialog.value = true
+}
+
+async function confirmDelete() {
+  if (!itemToDelete.value) return
+  try {
+    deletingId.value = itemToDelete.value.id
+    await deleteKematian(itemToDelete.value.id)
+
+    deleteDialog.value = false
+    const isLastItemOnPage = safeRows.value.length === 1 && page.value > 1
+    if (isLastItemOnPage) page.value = page.value - 1
+    await fetchKematian()
+  } catch (e: any) {
+    const msg = e?.response?.data?.message || 'Gagal menghapus data.'
+    alert(msg)
+  } finally {
+    itemToDelete.value = null
+    deletingId.value = null
+  }
+}
+
+// ====== TABLE HELPERS ======
+const pageCount = computed(() => meta.value.last_page || 1)
+const startNo   = computed(() => (meta.value.current_page - 1) * meta.value.per_page)
 </script>
-
-
 
 <template>
   <!-- Title & Add Button -->
@@ -189,7 +186,7 @@ function goToAddData() {
         v-model="search"
         label="Cari NIK / Nama"
         append-inner-icon="ri-search-line"
-        dense
+        density="comfortable"
         hide-details
         variant="outlined"
         clearable
@@ -202,7 +199,7 @@ function goToAddData() {
         type="date"
         label="Tanggal Awal"
         variant="outlined"
-        dense
+        density="comfortable"
         hide-details
         style="max-width: 200px"
         @update:model-value="triggerFetchDebounced"
@@ -213,23 +210,22 @@ function goToAddData() {
         type="date"
         label="Tanggal Akhir"
         variant="outlined"
-        dense
+        density="comfortable"
         hide-details
         style="max-width: 200px"
         @update:model-value="triggerFetchDebounced"
       />
 
-      <!-- Tombol Reset -->
-      <v-btn
-        color="secondary"
-        variant="text"
-        @click="resetFilter"
-        class="d-flex align-center"
-        style="height: 50px; min-width: 50px;"
-      >
+      <v-btn color="secondary" variant="text" @click="resetFilter" class="d-flex align-center"
+             style="height: 50px; min-width: 50px;">
         Reset Filter
       </v-btn>
     </div>
+
+    <!-- Error banner -->
+    <v-alert v-if="errorMsg" type="error" variant="tonal" class="mb-4">
+      {{ errorMsg }}
+    </v-alert>
 
     <!-- Table -->
     <v-table>
@@ -269,26 +265,20 @@ function goToAddData() {
           <td class="text-center">{{ item.nomor_akta }}</td>
           <td class="text-center">
             <v-btn
-  icon
-  size="small"
-  variant="text"
-  color="primary"
-  @click="router.push(`/aktakematian/${item.id}/edit`)"
->
-  <v-icon class="ri-edit-box-line" />
-</v-btn>
-           <v-btn
-  icon
-  size="small"
-  variant="text"
-  color="error"
-  class="ma-0 pa-0"
-  :loading="deletingId === item.id"
-  :disabled="deletingId === item.id"
-  @click="openDeleteDialog(item)"
->
-  <v-icon class="ri-delete-bin-line" />
-</v-btn>
+              icon size="small" variant="text" color="primary"
+              @click="router.push(`/aktakematian/${item.id}/edit`)"
+            >
+              <v-icon class="ri-edit-box-line" />
+            </v-btn>
+            <v-btn
+              icon size="small" variant="text" color="error"
+              class="ma-0 pa-0"
+              :loading="deletingId === item.id"
+              :disabled="deletingId === item.id"
+              @click="openDeleteDialog(item)"
+            >
+              <v-icon class="ri-delete-bin-line" />
+            </v-btn>
           </td>
         </tr>
 
@@ -309,7 +299,7 @@ function goToAddData() {
           v-model="itemsPerPage"
           :items="itemsPerPageOptions"
           variant="outlined"
-          dense
+          density="comfortable"
           hide-details
           style="max-width: 100px"
         />
@@ -320,46 +310,31 @@ function goToAddData() {
         :length="pageCount"
         prev-icon="ri-arrow-left-s-line"
         next-icon="ri-arrow-right-s-line"
-        total-visible="5"
+        :total-visible="5"
         rounded
       />
     </v-card-actions>
   </v-card>
+
+  <!-- Delete Dialog -->
   <v-dialog v-model="deleteDialog" max-width="420">
-  <v-card class="pa-4">
-    <v-card-title class="text-h6 font-weight-bold mb-2">
-      Delete Data
-    </v-card-title>
-
-    <v-card-text class="mb-4">
-      Anda yakin untuk menghapus data akta kematian
-      <strong>{{ itemToDelete?.nama_lengkap }}</strong> (NIK {{ itemToDelete?.nik }})?
-    </v-card-text>
-
-    <v-card-actions class="justify-end gap-2">
-      <v-btn
-        variant="outlined"
-        class="flex-1"
-        min-width="110"
-        @click="deleteDialog = false"
-      >
-        No
-      </v-btn>
-
-      <v-btn
-        variant="flat"
-        color="error"
-        class="flex-1"
-        min-width="110"
-        :loading="deletingId === itemToDelete?.id"
-        :disabled="deletingId === itemToDelete?.id"
-        @click="confirmDelete"
-      >
-        Yes
-      </v-btn>
-    </v-card-actions>
-  </v-card>
-</v-dialog>
-
+    <v-card class="pa-4">
+      <v-card-title class="text-h6 font-weight-bold mb-2">Delete Data</v-card-title>
+      <v-card-text class="mb-4">
+        Anda yakin untuk menghapus data akta kematian
+        <strong>{{ itemToDelete?.nama_lengkap }}</strong> (NIK {{ itemToDelete?.nik }})?
+      </v-card-text>
+      <v-card-actions class="justify-end gap-2">
+        <v-btn variant="outlined" class="flex-1" min-width="110" @click="deleteDialog = false">No</v-btn>
+        <v-btn
+          variant="flat" color="error" class="flex-1" min-width="110"
+          :loading="deletingId === itemToDelete?.id"
+          :disabled="deletingId === itemToDelete?.id"
+          @click="confirmDelete"
+        >
+          Yes
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 </template>
-

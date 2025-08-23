@@ -1,42 +1,30 @@
-import { fileURLToPath } from 'node:url'
+// vite.config.ts
 import vue from '@vitejs/plugin-vue'
 import vueJsx from '@vitejs/plugin-vue-jsx'
+import { fileURLToPath } from 'node:url'
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
 import { defineConfig } from 'vite'
 import vuetify from 'vite-plugin-vuetify'
 import svgLoader from 'vite-svg-loader'
 
-// https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
     vue(),
     vueJsx(),
-
-    // Docs: https://github.com/vuetifyjs/vuetify-loader/tree/master/packages/vite-plugin
     vuetify({
-      styles: {
-        configFile: 'src/assets/styles/variables/_vuetify.scss',
-      },
+      styles: { configFile: 'src/assets/styles/variables/_vuetify.scss' },
     }),
     Components({
       dirs: ['src/@core/components', 'src/components'],
       dts: true,
       resolvers: [
-        componentName => {
-          // Auto import `VueApexCharts`
-          if (componentName === 'VueApexCharts')
-            return { name: 'default', from: 'vue3-apexcharts', as: 'VueApexCharts' }
-        },
+        name => (name === 'VueApexCharts' ? { name: 'default', from: 'vue3-apexcharts', as: 'VueApexCharts' } : undefined),
       ],
     }),
-
-    // Docs: https://github.com/antfu/unplugin-auto-import#unplugin-auto-import
     AutoImport({
       imports: ['vue', 'vue-router', '@vueuse/core', '@vueuse/math', 'pinia'],
       vueTemplate: true,
-
-      // ℹ️ Disabled to avoid confusion & accidental usage
       ignore: ['useCookies', 'useStorage'],
     }),
     svgLoader(),
@@ -52,13 +40,21 @@ export default defineConfig({
       '@configured-variables': fileURLToPath(new URL('./src/assets/styles/variables/_template.scss', import.meta.url)),
     },
   },
-  build: {
-    chunkSizeWarningLimit: 5000,
+  server: {
+    host: '127.0.0.1',         // ⬅️ penting: gunakan 127.0.0.1 (bukan "localhost")
+    port: 5173,
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:8000', // ⬅️ URL Laravel kamu
+        changeOrigin: true,
+        // optional kalau backend butuh:
+        // secure: false,
+      },
+    },
   },
+  build: { chunkSizeWarningLimit: 5000 },
   optimizeDeps: {
     exclude: ['vuetify'],
-    entries: [
-      './src/**/*.vue',
-    ],
+    entries: ['./src/**/*.vue'],
   },
 })

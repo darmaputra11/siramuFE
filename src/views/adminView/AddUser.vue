@@ -105,7 +105,6 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
-const token = localStorage.getItem('token') || ''
 
 const form = ref({
   name: '',
@@ -136,13 +135,13 @@ async function submitForm() {
 
   loading.value = true
   try {
-    await createUser(token, {
-      name: form.value.name,                  // API pakai "name"
-      email: form.value.email,
-      password: form.value.password,
-      password_confirmation: form.value.password_confirmation,
-      role: roleCodeMap[form.value.role] || 'viewer',
-    })
+   await createUser({
+  name: form.value.name,
+  email: form.value.email,
+  password: form.value.password,
+  password_confirmation: form.value.password_confirmation,
+  role: roleCodeMap[form.value.role] || 'viewer',
+})
     // sukses → balik ke daftar user
     router.push('/users')
   } catch (e: any) {
