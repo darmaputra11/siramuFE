@@ -1,12 +1,15 @@
 <script lang="ts" setup>
 import type { PindahRow } from '@/api/pindah'
 import { deletePindah, getPindah } from '@/api/pindah'
+import { useAuthStore } from '@/store/auth'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import * as XLSX from "xlsx"
 
 const router = useRouter()
-const token = localStorage.getItem('token') || ''
+const auth = useAuthStore()
+const isViewer = computed(() => auth.isViewer)
+// const token = localStorage.getItem('token') || ''
 
 // ===== STATE =====
 const rows = ref<PindahRow[]>([])
@@ -27,7 +30,7 @@ const meta = ref({ current_page: 1, per_page: 5, total: 0, last_page: 1 })
 async function fetchPindah() {
   loading.value = true
   try {
-    const resp = await getPindah(token, {
+    const resp = await getPindah({
       page: page.value,
       per_page: itemsPerPage.value,
       q: search.value || undefined,
@@ -85,7 +88,7 @@ async function confirmDelete() {
   if (!itemToDelete.value) return
   try {
     deletingId.value = itemToDelete.value.id
-    await deletePindah(token, itemToDelete.value.id)
+    await deletePindah( itemToDelete.value.id)
 
     // tutup dialog & reset
     deleteDialog.value = false
@@ -172,7 +175,7 @@ function goToAddData() {
 
   <!-- Kolom kanan: Tombol -->
   <div class="d-flex align-center">
-    <v-btn @click="goToAddData" color="primary" variant="flat" class="mr-2">
+    <v-btn v-if="!isViewer" @click="goToAddData" color="primary" variant="flat" class="mr-2">
       <v-icon class="ri-add-line mr-1" /> Tambah Data
     </v-btn>
     <v-btn color="success" @click="exportExcel">
@@ -204,6 +207,7 @@ function goToAddData() {
         dense
         hide-details
         style="max-width: 200px"
+        @update:model-value="triggerFetchDebounced"
       />
 
       <v-text-field
@@ -214,6 +218,7 @@ function goToAddData() {
         dense
         hide-details
         style="max-width: 200px"
+        @update:model-value="triggerFetchDebounced"
       />
 
       <!-- Tombol Reset -->
@@ -246,7 +251,7 @@ function goToAddData() {
             <th class="text-center">No KK</th>
             <th class="text-center">Nomor Pindah</th>
             <th class="text-center">Tanggal Pindah</th>
-            <th class="text-center">Aksi</th>
+            <th v-if="!isViewer" class="text-center">Aksi</th>
           </tr>
         </thead>
 
@@ -266,8 +271,9 @@ function goToAddData() {
   <td class="text-center">{{ item.nomor_kk }}</td>       <!-- was: no_kk -->
   <td class="text-center">{{ item.nomor_pindah }}</td>
   <td class="text-center">{{ item.tanggal_pindah }}</td>
-  <td class="text-center">
+  <td v-if="!isViewer" class="text-center">
     <v-btn
+    v-if="!isViewer"
   icon
   size="small"
   variant="text"
@@ -277,6 +283,7 @@ function goToAddData() {
   <v-icon class="ri-edit-box-line" />
 </v-btn>
     <v-btn
+    v-if="!isViewer"
   icon
   size="small"
   variant="text"
@@ -291,7 +298,7 @@ function goToAddData() {
 </tr>
 
 <tr v-if="!loading && safeRows.length === 0">
-  <td colspan="8" class="text-center text-disabled">Tidak ada data ditemukan</td>
+  <td :colspan="isViewer ? 7 : 8" class="text-center text-disabled">Tidak ada data ditemukan</td>
 </tr>
 
         </tbody>

@@ -1,49 +1,38 @@
 <script setup lang="ts">
-import { loginApi } from "@/api/auth"
-import { setAuth, setRemember } from "@/utils/authStorage"
+import { useAuthStore } from "@/store/auth"; // ⬅️ pakai store kita
+import { setRemember } from "@/utils/AuthStorage"
 import { ref } from "vue"
 import { useRoute, useRouter } from "vue-router"
 
 const router = useRouter()
 const route = useRoute()
+const auth = useAuthStore()
 
-const form = ref({
-  email: "",
-  password: "",
-  remember: false,
-})
-
+const form = ref({ email: "", password: "", remember: false })
 const isPasswordVisible = ref(false)
 const loading = ref(false)
 
 const login = async () => {
   loading.value = true
   try {
-    // simpan preferensi remember sebelum login
     setRemember(form.value.remember)
 
-    const res = await loginApi(form.value.email, form.value.password)
+    // login melalui store -> store yang simpan token & user ke localStorage
+    await auth.login(form.value.email, form.value.password)
 
-    // 👉 log respons lengkap dari backend
-    console.log("✅ Login berhasil:", res.data)
+    // (opsional) kalau mau pastikan user terbaru dari /me:
+    // await auth.fetchUser()
 
-    // simpan token & user
-    const token = res.data?.token as string
-    const user = res.data?.user
-    if (!token) throw new Error("Token tidak ditemukan di response")
-
-    setAuth(token, user)
-
-    // redirect (kalau ada query redirect)
     const redirect = (route.query.redirect as string) || "/dashboard"
-    router.push(redirect)
+    router.replace(redirect)  // gunakan replace agar tidak bisa back ke login
   } catch (err: any) {
-    alert("Login gagal: " + (err.response?.data?.message || err.message))
+    alert("Login gagal: " + (err?.response?.data?.message || err?.message))
   } finally {
     loading.value = false
   }
 }
 </script>
+
 
 <template>
   <VContainer class="fill-height" fluid>

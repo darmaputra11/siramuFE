@@ -117,7 +117,7 @@ async function submitForm() {
 
   loading.value = true
   try {
-    await createPindah(token, {
+    await createPindah({
       nik: form.value.nik,
       nama_lengkap: form.value.nama_lengkap,
       nomor_kk: form.value.nomor_kk,

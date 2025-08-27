@@ -1,7 +1,5 @@
 // src/api/pindah.ts
-import axios from "axios"
-
-const API_URL = "http://127.0.0.1:8000/api"
+import http from "@/api/http"
 
 export interface PindahRow {
   id: number
@@ -9,12 +7,13 @@ export interface PindahRow {
   nama_lengkap: string
   nomor_kk: string
   nomor_pindah: string
-  tanggal_pindah: string
+  tanggal_pindah: string // yyyy-mm-dd
   created_at?: string
   updated_at?: string
 }
 
-export interface PindahPaginator {
+// Paginator default Laravel
+export interface PindahResponse {
   current_page: number
   data: PindahRow[]
   per_page: number | string
@@ -22,46 +21,34 @@ export interface PindahPaginator {
   last_page: number
 }
 
-// dukung paginator atau array polos
-type PindahListOrPaginator = PindahRow[] | PindahPaginator
-
-export const getPindah = async (
-  token: string,
-  params: {
-    page?: number
-    per_page?: number
-    q?: string
-    start_date?: string
-    end_date?: string
-    sort?: "oldest" | "newest"
-  } = {}
-) => {
-  return await axios.get<PindahListOrPaginator>(`${API_URL}/pindah`, {
-    params,
-    headers: { Authorization: `Bearer ${token}` },
-  })
+export interface PindahQuery {
+  page?: number
+  per_page?: number
+  q?: string
+  start_date?: string // yyyy-mm-dd
+  end_date?: string   // yyyy-mm-dd
+  sort?: "oldest" | "newest"
 }
 
-export const createPindah = async (token: string, payload: {
+export const getPindah = (params: PindahQuery = {}) => {
+  return http.get<PindahResponse>("/pindah", { params })
+}
+
+export const getPindahById = (id: number) => {
+  return http.get<PindahRow>(`/pindah/${id}`)
+}
+
+export const createPindah = (payload: {
   nik: string
   nama_lengkap: string
   nomor_kk: string
   nomor_pindah: string
   tanggal_pindah: string // yyyy-mm-dd
 }) => {
-  return await axios.post(`${API_URL}/pindah`, payload, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
+  return http.post("/pindah", payload)
 }
 
-export const getPindahById = async (token: string, id: number) => {
-  return await axios.get<PindahRow>(`${API_URL}/pindah/${id}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-}
-
-export const updatePindah = async (
-  token: string,
+export const updatePindah = (
   id: number,
   payload: {
     nik: string
@@ -71,13 +58,9 @@ export const updatePindah = async (
     tanggal_pindah: string // yyyy-mm-dd
   }
 ) => {
-  return await axios.put(`${API_URL}/pindah/${id}`, payload, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
+  return http.put(`/pindah/${id}`, payload)
 }
 
-export const deletePindah = async (token: string, id: number) => {
-  return await axios.delete(`${API_URL}/pindah/${id}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
+export const deletePindah = (id: number) => {
+  return http.delete(`/pindah/${id}`)
 }

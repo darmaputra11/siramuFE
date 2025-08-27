@@ -18,47 +18,47 @@ export const routes = [
         path: 'dashboard',
         name: 'dashboard',
         component: () => import('@/views/adminView/Dashboard.vue'),
-        meta: { requiresAuth: true },  // 👈 butuh login
+        meta: { requiresAuth: true, roles: ['admin','viewer'] },  // 👈 butuh login
       },
       {
         path: 'users',
         component: () => import('@/views/adminView/Users.vue'),
-        meta: { requiresAuth: true },
+        meta: { requiresAuth: true, roles: ['admin'] },
       },
       {
         path: 'users/add-user',
         component: () => import('@/views/adminView/AddUser.vue'),
-        meta: { requiresAuth: true },
+        meta: { requiresAuth: true, roles: ['admin'] },
       },
       {
         path: 'aktakematian',
         component: () => import('@/views/adminView/AktaKematian.vue'),
-        meta: { requiresAuth: true },
+        meta: { requiresAuth: true, roles: ['admin','viewer'] },
       },
       {
         path: 'aktakematian/create',
         component: () => import('@/views/adminView/AddAktaKematian.vue'),
-        meta: { requiresAuth: true },
+        meta: { requiresAuth: true, roles: ['admin'] },
       },
       {
         path: 'aktapindah',
         component: () => import('@/views/adminView/AktaPindah.vue'),
-        meta: { requiresAuth: true },
+        meta: { requiresAuth: true, roles: ['admin','viewer'] },
       },
       {
         path: 'aktapindah/create',
         component: () => import('@/views/adminView/AddAktaPindah.vue'),
-        meta: { requiresAuth: true },
+        meta: { requiresAuth: true, roles: ['admin'] },
       },
       {
         path: 'aktakematian/:id/edit',
         component: () => import('@/views/adminView/EditAktaKematian.vue'),
-        meta: { requiresAuth: true },
+        meta: { requiresAuth: true, roles: ['admin'] },
       },
       {
         path: 'aktapindah/:id/edit',
         component: () => import('@/views/adminView/EditAktaPindah.vue'),
-        meta: { requiresAuth: true },
+        meta: { requiresAuth: true, roles: ['admin'] },
       },
 
       // sisanya kalau memang private juga kasih requiresAuth

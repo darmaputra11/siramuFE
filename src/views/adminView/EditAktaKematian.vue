@@ -1,88 +1,77 @@
 <template>
   <div>
     <div class="d-flex align-center mb-4">
-      <!-- Back Button -->
-      <v-btn
-        icon
-        variant="outlined"
-        color="black"
-        class="bg-white mr-3"
-        @click="goBack"
-      >
+      <v-btn icon variant="outlined" color="black" class="bg-white mr-3" @click="goBack">
         <v-icon color="black">ri-arrow-left-line</v-icon>
       </v-btn>
 
-      <!-- Title & Subtitle -->
       <div>
         <h2 class="text-h5 font-weight-bold mb-1">Edit Akta Kematian</h2>
-        <div class="text-body-2 text-grey">
-          Perbarui data akta kematian di bawah ini
-        </div>
+        <div class="text-body-2 text-grey">Perbarui data akta kematian di bawah ini</div>
       </div>
     </div>
 
-    <!-- Card form -->
     <v-card class="pa-6" flat>
-      <!-- indikator loading detail -->
       <v-progress-linear v-if="loadingDetail" indeterminate class="mb-4" />
 
-      <v-form @submit.prevent="submitForm" class="space-y-4" v-if="!loadingDetail">
-        <!-- NIK -->
+      <v-form v-if="!loadingDetail" @submit.prevent="submitForm" class="space-y-4">
         <v-text-field
           class="mb-4"
           v-model="form.nik"
           label="NIK"
           placeholder="Masukkan NIK"
-          outlined
-          dense
+          outlined dense
           :error="!!errors.nik"
           :error-messages="errors.nik"
           required
         />
 
-        <!-- Nama Lengkap -->
         <v-text-field
           class="mb-4"
           v-model="form.nama_lengkap"
           label="Nama Lengkap"
           placeholder="Masukkan nama lengkap"
-          outlined
-          dense
+          outlined dense
           :error="!!errors.nama_lengkap"
           :error-messages="errors.nama_lengkap"
           required
         />
 
-        <!-- Tanggal Kematian -->
         <v-text-field
           class="mb-4"
           v-model="form.tanggal_kematian"
           label="Tanggal Kematian"
           type="date"
-          outlined
-          dense
+          outlined dense
           :error="!!errors.tanggal_kematian"
           :error-messages="errors.tanggal_kematian"
           required
         />
 
-        <!-- Nomor Akta -->
         <v-text-field
           class="mb-4"
           v-model="form.nomor_akta"
           label="Nomor Akta"
           placeholder="Masukkan nomor akta"
-          outlined
-          dense
+          outlined dense
           :error="!!errors.nomor_akta"
           :error-messages="errors.nomor_akta"
           required
         />
 
-        <!-- Tombol Simpan -->
-        <v-btn type="submit" color="primary" class="mt-4" :loading="saving" :disabled="saving">
-          Simpan Perubahan
-        </v-btn>
+        <div class="d-flex gap-2 mt-4">
+          <v-btn
+            type="submit"
+            color="primary"
+            :loading="saving"
+            :disabled="saving || !isDirty"
+          >
+            Simpan Perubahan
+          </v-btn>
+          <v-btn variant="text" @click="resetToOriginal" :disabled="saving || !isDirty">
+            Reset ke Data Awal
+          </v-btn>
+        </div>
       </v-form>
     </v-card>
   </div>
@@ -90,21 +79,23 @@
 
 <script setup lang="ts">
 import { getKematianById, updateKematian } from '@/api/kematian'
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 const route = useRoute()
 const router = useRouter()
-const token = localStorage.getItem('token') || ''
 
-const id = Number(route.params.id)
+// id dari route
+const id = ref<number>(Number(route.params.id))
 
+// form & snapshot original (untuk cek perubahan)
 const form = ref({
   nik: '',
   nama_lengkap: '',
   tanggal_kematian: '', // yyyy-mm-dd
   nomor_akta: '',
 })
+const original = ref({ ...form.value })
 
 const loadingDetail = ref(true)
 const saving = ref(false)
@@ -114,16 +105,28 @@ function clearErrors() {
   errors.value = {}
 }
 
+function normalizeDate(value?: string | null): string {
+  if (!value) return ''
+  // pastikan format yyyy-mm-dd
+  return value.slice(0, 10)
+}
+
 async function loadDetail() {
   loadingDetail.value = true
+  clearErrors()
   try {
-    const { data } = await getKematianById(token, id)
+    const { data } = await getKematianById(id.value)
     // isi form dengan nilai dari API
-    form.value.nik = data.nik
-    form.value.nama_lengkap = data.nama_lengkap
-    // pastikan format date yyyy-mm-dd
-    form.value.tanggal_kematian = (data.tanggal_kematian || '').slice(0, 10)
-    form.value.nomor_akta = data.nomor_akta
+    form.value = {
+      nik: data.nik || '',
+      nama_lengkap: data.nama_lengkap || '',
+      tanggal_kematian: normalizeDate(data.tanggal_kematian),
+      nomor_akta: data.nomor_akta || '',
+    }
+    // simpan snapshot original agar tombol "Simpan" hanya aktif jika ada perubahan
+    original.value = { ...form.value }
+    // logging ringan
+    console.log('[Edit Kematian] loaded:', { id: id.value, data })
   } catch (e: any) {
     const msg = e?.response?.data?.message || 'Gagal memuat data.'
     alert(msg)
@@ -133,29 +136,47 @@ async function loadDetail() {
   }
 }
 
+// dirty check: apakah ada perbedaan dari snapshot original
+const isDirty = computed(() => {
+  const a = form.value
+  const b = original.value
+  return (
+    a.nik !== b.nik ||
+    a.nama_lengkap !== b.nama_lengkap ||
+    a.tanggal_kematian !== b.tanggal_kematian ||
+    a.nomor_akta !== b.nomor_akta
+  )
+})
+
+function resetToOriginal() {
+  form.value = { ...original.value }
+}
+
 async function submitForm() {
   clearErrors()
 
-  // validasi ringan
-  if (!form.value.nik || !form.value.nama_lengkap || !form.value.tanggal_kematian || !form.value.nomor_akta) {
-    const missing: string[] = []
-    if (!form.value.nik) missing.push('NIK')
-    if (!form.value.nama_lengkap) missing.push('Nama Lengkap')
-    if (!form.value.tanggal_kematian) missing.push('Tanggal Kematian')
-    if (!form.value.nomor_akta) missing.push('Nomor Akta')
+  // validasi ringan di sisi client
+  const missing: string[] = []
+  if (!form.value.nik) missing.push('NIK')
+  if (!form.value.nama_lengkap) missing.push('Nama Lengkap')
+  if (!form.value.tanggal_kematian) missing.push('Tanggal Kematian')
+  if (!form.value.nomor_akta) missing.push('Nomor Akta')
+  if (missing.length) {
     alert(`Harap isi: ${missing.join(', ')}`)
     return
   }
 
   saving.value = true
   try {
-    await updateKematian(token, id, {
+    await updateKematian(id.value, {
       nik: form.value.nik,
       nama_lengkap: form.value.nama_lengkap,
       tanggal_kematian: form.value.tanggal_kematian,
       nomor_akta: form.value.nomor_akta,
     })
-    // sukses → kembali ke list
+    // update snapshot agar tombol simpan nonaktif lagi
+    original.value = { ...form.value }
+    // kembali ke list
     router.push('/aktakematian')
   } catch (e: any) {
     if (e?.response?.status === 401) {
@@ -179,5 +200,15 @@ function goBack() {
   router.back()
 }
 
+// load awal
 onMounted(loadDetail)
+
+// jika id di route berubah (navigasi ke item lain), muat ulang
+watch(
+  () => route.params.id,
+  (val) => {
+    id.value = Number(val)
+    loadDetail()
+  }
+)
 </script>

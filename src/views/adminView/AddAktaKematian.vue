@@ -124,7 +124,7 @@ async function submitForm() {
 
   loading.value = true
   try {
-    await createKematian(token, {
+    await createKematian({
       nik: form.value.nik,
       nama_lengkap: form.value.nama_lengkap,
       tanggal_kematian: form.value.tanggal_kematian, // yyyy-mm-dd

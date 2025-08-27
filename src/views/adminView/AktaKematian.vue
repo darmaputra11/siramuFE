@@ -1,12 +1,14 @@
 <script lang="ts" setup>
 import type { KematianResponse, KematianRow } from '@/api/kematian'
 import { deleteKematian, getKematian } from '@/api/kematian'
+import { useAuthStore } from '@/store/auth'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import * as XLSX from 'xlsx'
 
 const router = useRouter()
-
+const auth = useAuthStore()
+const isViewer = computed(() => auth.isViewer)
 // ====== STATE ======
 const rows = ref<KematianRow[]>([])
 const loading = ref(false)
@@ -169,7 +171,7 @@ const startNo   = computed(() => (meta.value.current_page - 1) * meta.value.per_
   <div class="d-flex justify-space-between align-center mb-4">
     <h3 class="text-h3 font-weight-bold">Data Kematian</h3>
     <div class="d-flex align-center">
-      <v-btn @click="goToAddData" color="primary" variant="flat" class="mr-2">
+      <v-btn v-if="!isViewer" @click="goToAddData" color="primary" variant="flat" class="mr-2">
         <v-icon class="ri-add-line mr-1" /> Tambah Data
       </v-btn>
       <v-btn color="success" @click="exportExcel">
@@ -244,7 +246,7 @@ const startNo   = computed(() => (meta.value.current_page - 1) * meta.value.per_
           <th class="text-center">Nama Lengkap</th>
           <th class="text-center">Tanggal Kematian</th>
           <th class="text-center">Nomor Akta</th>
-          <th class="text-center">Aksi</th>
+          <th v-if="!isViewer" class="text-center">Aksi</th>
         </tr>
       </thead>
 
@@ -263,7 +265,7 @@ const startNo   = computed(() => (meta.value.current_page - 1) * meta.value.per_
           <td class="text-center">{{ item.nama_lengkap }}</td>
           <td class="text-center">{{ item.tanggal_kematian }}</td>
           <td class="text-center">{{ item.nomor_akta }}</td>
-          <td class="text-center">
+          <td v-if="!isViewer" class="text-center">
             <v-btn
               icon size="small" variant="text" color="primary"
               @click="router.push(`/aktakematian/${item.id}/edit`)"
@@ -283,7 +285,7 @@ const startNo   = computed(() => (meta.value.current_page - 1) * meta.value.per_
         </tr>
 
         <tr v-if="!loading && safeRows.length === 0">
-          <td colspan="7" class="text-center text-disabled">Tidak ada data ditemukan</td>
+          <td :colspan="isViewer ? 6 : 7" class="text-center text-disabled">Tidak ada data ditemukan</td>
         </tr>
       </tbody>
     </v-table>

@@ -1,31 +1,20 @@
 <template>
   <div>
     <div class="d-flex align-center mb-4">
-      <!-- Back Button -->
-      <v-btn
-        icon
-        variant="outlined"
-        color="black"
-        class="bg-white mr-3"
-        @click="goBack"
-      >
+      <v-btn icon variant="outlined" color="black" class="bg-white mr-3" @click="goBack">
         <v-icon color="black">ri-arrow-left-line</v-icon>
       </v-btn>
 
-      <!-- Title & Subtitle -->
       <div>
         <h2 class="text-h5 font-weight-bold mb-1">Edit Data Pindah</h2>
-        <div class="text-body-2 text-grey">
-          Perbarui data di bawah untuk menyimpan perubahan
-        </div>
+        <div class="text-body-2 text-grey">Perbarui data di bawah untuk menyimpan perubahan</div>
       </div>
     </div>
 
     <v-card class="pa-6" flat>
-      <!-- indikator loading detail -->
       <v-progress-linear v-if="loadingDetail" indeterminate class="mb-4" />
 
-      <v-form v-else @submit.prevent="submitForm" class="space-y-4">
+      <v-form v-if="!loadingDetail" @submit.prevent="submitForm" class="space-y-4">
         <!-- NIK -->
         <v-text-field
           class="mb-4"
@@ -76,10 +65,19 @@
           :error="!!errors.tanggal_pindah" :error-messages="errors.tanggal_pindah"
         />
 
-        <!-- Tombol Simpan -->
-        <v-btn type="submit" color="primary" class="mt-4" :loading="saving" :disabled="saving">
-          Simpan Perubahan
-        </v-btn>
+        <div class="d-flex gap-2 mt-4">
+          <v-btn
+            type="submit"
+            color="primary"
+            :loading="saving"
+            :disabled="saving || !isDirty"
+          >
+            Simpan Perubahan
+          </v-btn>
+          <v-btn variant="text" @click="resetToOriginal" :disabled="saving || !isDirty">
+            Reset ke Data Awal
+          </v-btn>
+        </div>
       </v-form>
     </v-card>
   </div>
@@ -87,15 +85,16 @@
 
 <script setup lang="ts">
 import { getPindahById, updatePindah } from '@/api/pindah'
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 const route = useRoute()
 const router = useRouter()
-const token = localStorage.getItem('token') || ''
 
-const id = Number(route.params.id)
+// id dari route
+const id = ref<number>(Number(route.params.id))
 
+// form & snapshot original
 const form = ref({
   nik: '',
   nama_lengkap: '',
@@ -103,28 +102,59 @@ const form = ref({
   nomor_pindah: '',
   tanggal_pindah: '', // yyyy-mm-dd
 })
+const original = ref({ ...form.value })
 
 const loadingDetail = ref(true)
 const saving = ref(false)
 const errors = ref<Record<string, string[]>>({})
 
-function clearErrors() { errors.value = {} }
+function clearErrors() {
+  errors.value = {}
+}
+
+function normalizeDate(value?: string | null): string {
+  if (!value) return ''
+  return value.slice(0, 10) // yyyy-mm-dd
+}
 
 async function loadDetail() {
   loadingDetail.value = true
+  clearErrors()
   try {
-    const { data } = await getPindahById(token, id)
-    form.value.nik = data.nik
-    form.value.nama_lengkap = data.nama_lengkap
-    form.value.nomor_kk = data.nomor_kk
-    form.value.nomor_pindah = data.nomor_pindah
-    form.value.tanggal_pindah = (data.tanggal_pindah || '').slice(0, 10) // pastikan yyyy-mm-dd
+    const { data } = await getPindahById(id.value)
+    form.value = {
+      nik: data.nik || '',
+      nama_lengkap: data.nama_lengkap || '',
+      nomor_kk: data.nomor_kk || '',
+      nomor_pindah: data.nomor_pindah || '',
+      tanggal_pindah: normalizeDate(data.tanggal_pindah),
+    }
+    original.value = { ...form.value }
+    console.log('[Edit Pindah] loaded:', { id: id.value, data })
   } catch (e: any) {
-    alert(e?.response?.data?.message || 'Gagal memuat data.')
+    const msg = e?.response?.data?.message || 'Gagal memuat data.'
+    alert(msg)
     router.back()
   } finally {
     loadingDetail.value = false
   }
+}
+
+// dirty check
+const isDirty = computed(() => {
+  const a = form.value
+  const b = original.value
+  return (
+    a.nik !== b.nik ||
+    a.nama_lengkap !== b.nama_lengkap ||
+    a.nomor_kk !== b.nomor_kk ||
+    a.nomor_pindah !== b.nomor_pindah ||
+    a.tanggal_pindah !== b.tanggal_pindah
+  )
+})
+
+function resetToOriginal() {
+  form.value = { ...original.value }
 }
 
 async function submitForm() {
@@ -144,14 +174,16 @@ async function submitForm() {
 
   saving.value = true
   try {
-    await updatePindah(token, id, {
-      nik: form.value.nik,
-      nama_lengkap: form.value.nama_lengkap,
-      nomor_kk: form.value.nomor_kk,
-      nomor_pindah: form.value.nomor_pindah,
-      tanggal_pindah: form.value.tanggal_pindah,
+    await updatePindah(id.value, {
+      nik: form.value.nik.trim(),
+      nama_lengkap: form.value.nama_lengkap.trim(),
+      nomor_kk: form.value.nomor_kk.trim(),
+      nomor_pindah: form.value.nomor_pindah.trim(),
+      tanggal_pindah: form.value.tanggal_pindah, // yyyy-mm-dd
     })
-    router.push('/aktapindah') // kembali ke list
+    // update snapshot agar tombol simpan nonaktif lagi
+    original.value = { ...form.value }
+    router.push('/aktapindah')
   } catch (e: any) {
     if (e?.response?.status === 401) {
       alert('Sesi habis. Silakan login kembali.')
@@ -169,7 +201,18 @@ async function submitForm() {
   }
 }
 
-function goBack() { router.back() }
+function goBack() {
+  router.back()
+}
 
 onMounted(loadDetail)
+
+// jika id di route berubah, muat ulang
+watch(
+  () => route.params.id,
+  (val) => {
+    id.value = Number(val)
+    if (!Number.isNaN(id.value)) loadDetail()
+  }
+)
 </script>
