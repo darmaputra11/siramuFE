@@ -15,57 +15,59 @@
       <v-progress-linear v-if="loadingDetail" indeterminate class="mb-4" />
 
       <v-form v-if="!loadingDetail" @submit.prevent="submitForm" class="space-y-4">
+        <!-- NIK -->
         <v-text-field
           class="mb-4"
           v-model="form.nik"
           label="NIK"
           placeholder="Masukkan NIK"
-          outlined dense
-          :error="!!errors.nik"
-          :error-messages="errors.nik"
-          required
+          variant="outlined" density="comfortable"
+          :error="!!errors.nik" :error-messages="errors.nik" required
         />
 
+        <!-- Nama Lengkap -->
         <v-text-field
           class="mb-4"
           v-model="form.nama_lengkap"
           label="Nama Lengkap"
           placeholder="Masukkan nama lengkap"
-          outlined dense
-          :error="!!errors.nama_lengkap"
-          :error-messages="errors.nama_lengkap"
-          required
+          variant="outlined" density="comfortable"
+          :error="!!errors.nama_lengkap" :error-messages="errors.nama_lengkap" required
         />
 
+        <!-- Tanggal Kematian -->
         <v-text-field
           class="mb-4"
           v-model="form.tanggal_kematian"
           label="Tanggal Kematian"
           type="date"
-          outlined dense
-          :error="!!errors.tanggal_kematian"
-          :error-messages="errors.tanggal_kematian"
-          required
+          variant="outlined" density="comfortable"
+          :error="!!errors.tanggal_kematian" :error-messages="errors.tanggal_kematian" required
         />
 
+        <!-- Tanggal Akta (WAJIB) -->
+        <v-text-field
+          class="mb-4"
+          v-model="form.tanggal_akta"
+          label="Tanggal Akta"
+          type="date"
+          :min="form.tanggal_kematian || undefined"
+          variant="outlined" density="comfortable"
+          :error="!!errors.tanggal_akta" :error-messages="errors.tanggal_akta" required
+        />
+
+        <!-- Nomor Akta -->
         <v-text-field
           class="mb-4"
           v-model="form.nomor_akta"
           label="Nomor Akta"
           placeholder="Masukkan nomor akta"
-          outlined dense
-          :error="!!errors.nomor_akta"
-          :error-messages="errors.nomor_akta"
-          required
+          variant="outlined" density="comfortable"
+          :error="!!errors.nomor_akta" :error-messages="errors.nomor_akta" required
         />
 
         <div class="d-flex gap-2 mt-4">
-          <v-btn
-            type="submit"
-            color="primary"
-            :loading="saving"
-            :disabled="saving || !isDirty"
-          >
+          <v-btn type="submit" color="primary" :loading="saving" :disabled="saving || !isDirty">
             Simpan Perubahan
           </v-btn>
           <v-btn variant="text" @click="resetToOriginal" :disabled="saving || !isDirty">
@@ -88,11 +90,12 @@ const router = useRouter()
 // id dari route
 const id = ref<number>(Number(route.params.id))
 
-// form & snapshot original (untuk cek perubahan)
+// form & snapshot original
 const form = ref({
   nik: '',
   nama_lengkap: '',
   tanggal_kematian: '', // yyyy-mm-dd
+  tanggal_akta: '',     // yyyy-mm-dd (wajib)
   nomor_akta: '',
 })
 const original = ref({ ...form.value })
@@ -116,16 +119,14 @@ async function loadDetail() {
   clearErrors()
   try {
     const { data } = await getKematianById(id.value)
-    // isi form dengan nilai dari API
     form.value = {
       nik: data.nik || '',
       nama_lengkap: data.nama_lengkap || '',
       tanggal_kematian: normalizeDate(data.tanggal_kematian),
+      tanggal_akta: normalizeDate((data as any).tanggal_akta), // aman jika null
       nomor_akta: data.nomor_akta || '',
     }
-    // simpan snapshot original agar tombol "Simpan" hanya aktif jika ada perubahan
     original.value = { ...form.value }
-    // logging ringan
     console.log('[Edit Kematian] loaded:', { id: id.value, data })
   } catch (e: any) {
     const msg = e?.response?.data?.message || 'Gagal memuat data.'
@@ -136,7 +137,7 @@ async function loadDetail() {
   }
 }
 
-// dirty check: apakah ada perbedaan dari snapshot original
+// dirty check
 const isDirty = computed(() => {
   const a = form.value
   const b = original.value
@@ -144,6 +145,7 @@ const isDirty = computed(() => {
     a.nik !== b.nik ||
     a.nama_lengkap !== b.nama_lengkap ||
     a.tanggal_kematian !== b.tanggal_kematian ||
+    a.tanggal_akta !== b.tanggal_akta ||
     a.nomor_akta !== b.nomor_akta
   )
 })
@@ -155,14 +157,19 @@ function resetToOriginal() {
 async function submitForm() {
   clearErrors()
 
-  // validasi ringan di sisi client
+  // validasi sederhana
   const missing: string[] = []
   if (!form.value.nik) missing.push('NIK')
   if (!form.value.nama_lengkap) missing.push('Nama Lengkap')
   if (!form.value.tanggal_kematian) missing.push('Tanggal Kematian')
+  if (!form.value.tanggal_akta) missing.push('Tanggal Akta')
   if (!form.value.nomor_akta) missing.push('Nomor Akta')
   if (missing.length) {
     alert(`Harap isi: ${missing.join(', ')}`)
+    return
+  }
+  if (form.value.tanggal_akta < form.value.tanggal_kematian) {
+    alert('Tanggal Akta tidak boleh lebih awal dari Tanggal Kematian.')
     return
   }
 
@@ -172,11 +179,10 @@ async function submitForm() {
       nik: form.value.nik,
       nama_lengkap: form.value.nama_lengkap,
       tanggal_kematian: form.value.tanggal_kematian,
+      tanggal_akta: form.value.tanggal_akta,   // <-- ikut dikirim
       nomor_akta: form.value.nomor_akta,
     })
-    // update snapshot agar tombol simpan nonaktif lagi
     original.value = { ...form.value }
-    // kembali ke list
     router.push('/aktakematian')
   } catch (e: any) {
     if (e?.response?.status === 401) {
@@ -202,8 +208,7 @@ function goBack() {
 
 // load awal
 onMounted(loadDetail)
-
-// jika id di route berubah (navigasi ke item lain), muat ulang
+// jika id di route berubah, muat ulang
 watch(
   () => route.params.id,
   (val) => {

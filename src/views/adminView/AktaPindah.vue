@@ -2,6 +2,7 @@
 import type { PindahRow } from '@/api/pindah'
 import { deletePindah, getPindah } from '@/api/pindah'
 import { useAuthStore } from '@/store/auth'
+import { toDisplay } from '@/utils/date'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import * as XLSX from "xlsx"
@@ -17,8 +18,8 @@ const safeRows = computed<PindahRow[]>(() => Array.isArray(rows.value) ? rows.va
 const loading = ref(false)
 
 const page = ref(1)
-const itemsPerPage = ref(5)
-const itemsPerPageOptions = [5, 10, 50, 100]
+const itemsPerPage = ref(20)
+const itemsPerPageOptions = [20, 50, 100, 500]
 const search = ref('')
 
 const startDate = ref<string | null>(null)
@@ -36,7 +37,6 @@ async function fetchPindah() {
       q: search.value || undefined,
       start_date: startDate.value || undefined,
       end_date: endDate.value || undefined,
-      sort: 'oldest',
     })
 
     const payload: any = resp.data
@@ -144,12 +144,13 @@ function exportExcel() {
     ? safeRows.value.filter(r => selectedRows.value.includes(r.id))
     : safeRows.value
 
-  const exportData = dataToExport.map(r => ({
+  const exportData = dataToExport.map((r, i) => ({
+    'No': i + 1,
     NIK: r.nik,
     'Nama Lengkap': r.nama_lengkap,
     'No KK': r.nomor_kk,
     'Nomor Pindah': r.nomor_pindah,
-    'Tanggal Pindah': r.tanggal_pindah,
+    'Tanggal': toDisplay(r.tanggal_pindah),
   }))
 
   const wb = XLSX.utils.book_new()
@@ -250,7 +251,7 @@ function goToAddData() {
             <th class="text-center">Nama Lengkap</th>
             <th class="text-center">No KK</th>
             <th class="text-center">Nomor Pindah</th>
-            <th class="text-center">Tanggal Pindah</th>
+            <th class="text-center">Tanggal</th>
             <th v-if="!isViewer" class="text-center">Aksi</th>
           </tr>
         </thead>
@@ -270,7 +271,7 @@ function goToAddData() {
   <td class="text-center">{{ item.nama_lengkap }}</td>   <!-- was: nama -->
   <td class="text-center">{{ item.nomor_kk }}</td>       <!-- was: no_kk -->
   <td class="text-center">{{ item.nomor_pindah }}</td>
-  <td class="text-center">{{ item.tanggal_pindah }}</td>
+  <td class="text-center">{{ toDisplay(item.tanggal_pindah) }}</td>
   <td v-if="!isViewer" class="text-center">
     <v-btn
     v-if="!isViewer"

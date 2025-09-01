@@ -27,7 +27,7 @@ export interface PindahQuery {
   q?: string
   start_date?: string // yyyy-mm-dd
   end_date?: string   // yyyy-mm-dd
-  sort?: "oldest" | "newest"
+  sort?: "newest"
 }
 
 export const getPindah = (params: PindahQuery = {}) => {

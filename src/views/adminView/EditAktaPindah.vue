@@ -59,7 +59,7 @@
         <v-text-field
           class="mb-4"
           v-model="form.tanggal_pindah"
-          label="Tanggal Pindah"
+          label="Tanggal"
           type="date"
           outlined dense required
           :error="!!errors.tanggal_pindah" :error-messages="errors.tanggal_pindah"

@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import type { UserRow, UsersResponse } from '@/api/users'
-import { deleteUser, getUsers } from '@/api/users'
+import { deleteUser, getUsers, resetUserPassword } from '@/api/users'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -37,6 +37,9 @@ const newPassword = ref('')
 const deletingId = ref<number | null>(null)
 const deleteDialog = ref(false)
 const userToDelete = ref<UserRow | null>(null)
+
+const savingPwd = ref(false)       // ⬅️ state loading tombol simpan
+const showPwd = ref(false)         // ⬅️ optional: toggle lihat password
 
 // ====== API LOAD ======
 async function fetchUsers() {
@@ -116,15 +119,27 @@ function toggleSelection(id: number) {
 // ====== DETAIL DIALOG & ACTIONS ======
 function openDetailDialog(user: UserRow) {
   selectedUser.value = user
+  newPassword.value = ''
   dialog.value = true
 }
 
-function updatePassword() {
-  if (!newPassword.value) return alert('Password tidak boleh kosong')
-  // TODO: panggil endpoint update password /users/{id}/password kalau sudah ada di backend
-  console.log('Update password untuk:', selectedUser.value?.id, newPassword.value)
-  dialog.value = false
-  newPassword.value = ''
+async function updatePassword() {
+  if (!selectedUser.value) return
+  if (!newPassword.value) { alert('Password tidak boleh kosong'); return }
+  if (newPassword.value.length < 6) { alert('Minimal 6 karakter'); return }
+
+  try {
+    savingPwd.value = true
+    await resetUserPassword(selectedUser.value.id, newPassword.value)
+    alert('Password berhasil direset.')
+    dialog.value = false
+    newPassword.value = ''
+  } catch (e: any) {
+    const msg = e?.response?.data?.message || 'Gagal mengubah password.'
+    alert(msg)
+  } finally {
+    savingPwd.value = false
+  }
 }
 
 function goToAddUser() {
@@ -288,29 +303,49 @@ const roleLabel = (role: string) => {
   </v-card>
 
   <!-- Detail Dialog -->
-  <v-dialog v-model="dialog" max-width="500">
-    <v-card>
-      <v-card-title class="text-h5 my-3 font-weight-bold">Detail User</v-card-title>
+<v-dialog v-model="dialog" max-width="500">
+  <v-card>
+    <v-card-title class="text-h5 my-3 font-weight-bold">Detail User</v-card-title>
 
-      <v-card-text v-if="selectedUser">
-        <div class="mb-3">
-          <p><strong>Username:</strong> {{ selectedUser.name }}</p>
-          <p><strong>Email:</strong> {{ selectedUser.email }}</p>
-          <p><strong>Role:</strong> {{ roleLabel(selectedUser.role) }}</p>
-        </div>
+    <v-card-text v-if="selectedUser">
+      <div class="mb-3">
+        <p><strong>Username:</strong> {{ selectedUser.name }}</p>
+        <p><strong>Email:</strong> {{ selectedUser.email }}</p>
+        <p><strong>Role:</strong> {{ roleLabel(selectedUser.role) }}</p>
+      </div>
 
-        <v-divider class="my-4" />
+      <v-divider class="my-4" />
 
-        <h4 class="text-subtitle-1 font-weight-medium mb-2">Ubah Password</h4>
-        <v-text-field v-model="newPassword" label="Password Baru" type="password" variant="outlined" density="comfortable" />
-      </v-card-text>
+      <h4 class="text-subtitle-1 font-weight-medium mb-2">Ubah Password (Admin)</h4>
+      <v-text-field
+        v-model="newPassword"
+        :type="showPwd ? 'text' : 'password'"
+        label="Password Baru"
+        variant="outlined"
+        density="comfortable"
+        :append-inner-icon="showPwd ? 'ri-eye-off-line' : 'ri-eye-line'"
+        @click:append-inner="showPwd = !showPwd"
+        :disabled="savingPwd"
+      />
+      <div class="text-caption text-medium-emphasis">
+        Minimal 6 karakter. User akan login dengan password baru ini.
+      </div>
+    </v-card-text>
 
-      <v-card-actions class="justify-end">
-        <v-btn variant="outlined" @click="dialog = false">Tutup</v-btn>
-        <v-btn variant="flat" color="primary" @click="updatePassword">Simpan</v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
+    <v-card-actions class="justify-end">
+      <v-btn variant="outlined" @click="dialog = false" :disabled="savingPwd">Tutup</v-btn>
+      <v-btn
+        variant="flat"
+        color="primary"
+        @click="updatePassword"
+        :loading="savingPwd"
+        :disabled="savingPwd || !newPassword || newPassword.length < 6"
+      >
+        Simpan
+      </v-btn>
+    </v-card-actions>
+  </v-card>
+</v-dialog>
 
   <!-- Delete Dialog -->
   <v-dialog v-model="deleteDialog" max-width="400">

@@ -2,6 +2,7 @@
 import type { KematianResponse, KematianRow } from '@/api/kematian'
 import { deleteKematian, getKematian } from '@/api/kematian'
 import { useAuthStore } from '@/store/auth'
+import { toDisplay } from '@/utils/date'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import * as XLSX from 'xlsx'
@@ -9,18 +10,20 @@ import * as XLSX from 'xlsx'
 const router = useRouter()
 const auth = useAuthStore()
 const isViewer = computed(() => auth.isViewer)
+
 // ====== STATE ======
 const rows = ref<KematianRow[]>([])
 const loading = ref(false)
 const errorMsg = ref('')
 
 const page = ref(1)
-const itemsPerPage = ref(5)
-const itemsPerPageOptions = [5, 10, 50, 100]
+const itemsPerPage = ref(20)
+const itemsPerPageOptions = [20, 50, 100, 500]
 const search = ref('')
 
-const startDate = ref<string | null>(null)
-const endDate   = ref<string | null>(null)
+// ⬇️ ganti ke filter tanggal AKTA
+const aktaStartDate = ref<string | null>(null)
+const aktaEndDate   = ref<string | null>(null)
 
 const meta = ref({
   current_page: 1,
@@ -41,9 +44,10 @@ async function fetchKematian() {
       page: page.value,
       per_page: itemsPerPage.value,
       q: search.value || undefined,
-      start_date: startDate.value || undefined,
-      end_date: endDate.value || undefined,
-      sort: 'oldest',
+      // ⬇️ kirim filter AKTA ke backend
+      akta_start_date: aktaStartDate.value || undefined,
+      akta_end_date: aktaEndDate.value || undefined,
+      // tidak kirim param sort — backend sudah handle by created_at
     })
     console.log('[Kematian] loaded:', data as KematianResponse)
 
@@ -102,13 +106,13 @@ function toggleSelection(nik: string) {
 // reset filter
 function resetFilter() {
   search.value = ''
-  startDate.value = null
-  endDate.value = null
+  aktaStartDate.value = null
+  aktaEndDate.value = null
   page.value = 1
   fetchKematian()
 }
 
-// export excel
+// export excel (tambah kolom Tanggal Akta)
 function exportExcel() {
   const dataToExport = selectedRows.value.length
     ? rows.value.filter(r => selectedRows.value.includes(r.nik))
@@ -117,8 +121,9 @@ function exportExcel() {
   const exportData = dataToExport.map(r => ({
     NIK: r.nik,
     'Nama Lengkap': r.nama_lengkap,
-    'Tanggal Kematian': r.tanggal_kematian,
+    'Tanggal Kematian': toDisplay(r.tanggal_kematian),
     'Nomor Akta': r.nomor_akta,
+    'Tanggal Akta': toDisplay(r.tanggal_akta) ?? '', // tampilkan kosong jika null
   }))
 
   const wb = XLSX.utils.book_new()
@@ -182,7 +187,7 @@ const startNo   = computed(() => (meta.value.current_page - 1) * meta.value.per_
 
   <!-- Card -->
   <v-card elevation="4" class="pa-4">
-    <!-- Search & Date Filter -->
+    <!-- Search & Date Filter (AKTA) -->
     <div class="mb-4 d-flex gap-4 flex-wrap">
       <v-text-field
         v-model="search"
@@ -197,24 +202,24 @@ const startNo   = computed(() => (meta.value.current_page - 1) * meta.value.per_
       />
 
       <v-text-field
-        v-model="startDate"
+        v-model="aktaStartDate"
         type="date"
-        label="Tanggal Awal"
+        label="Tanggal Awal (Akta Kematian)"
         variant="outlined"
         density="comfortable"
         hide-details
-        style="max-width: 200px"
+        style="max-width: 260px"
         @update:model-value="triggerFetchDebounced"
       />
 
       <v-text-field
-        v-model="endDate"
+        v-model="aktaEndDate"
         type="date"
-        label="Tanggal Akhir"
+        label="Tanggal Akhir (Akta Kematian)"
         variant="outlined"
         density="comfortable"
         hide-details
-        style="max-width: 200px"
+        style="max-width: 260px"
         @update:model-value="triggerFetchDebounced"
       />
 
@@ -245,6 +250,7 @@ const startNo   = computed(() => (meta.value.current_page - 1) * meta.value.per_
           <th class="text-center">NIK</th>
           <th class="text-center">Nama Lengkap</th>
           <th class="text-center">Tanggal Kematian</th>
+          <th class="text-center">Tanggal Akta</th>
           <th class="text-center">Nomor Akta</th>
           <th v-if="!isViewer" class="text-center">Aksi</th>
         </tr>
@@ -263,7 +269,8 @@ const startNo   = computed(() => (meta.value.current_page - 1) * meta.value.per_
           <td>{{ startNo + index + 1 }}</td>
           <td class="text-center">{{ item.nik }}</td>
           <td class="text-center">{{ item.nama_lengkap }}</td>
-          <td class="text-center">{{ item.tanggal_kematian }}</td>
+          <td class="text-center">{{ toDisplay(item.tanggal_kematian) }}</td>
+          <td class="text-center">{{ toDisplay(item.tanggal_akta) ?? '-' }}</td>
           <td class="text-center">{{ item.nomor_akta }}</td>
           <td v-if="!isViewer" class="text-center">
             <v-btn
@@ -285,7 +292,7 @@ const startNo   = computed(() => (meta.value.current_page - 1) * meta.value.per_
         </tr>
 
         <tr v-if="!loading && safeRows.length === 0">
-          <td :colspan="isViewer ? 6 : 7" class="text-center text-disabled">Tidak ada data ditemukan</td>
+          <td :colspan="isViewer ? 7 : 8" class="text-center text-disabled">Tidak ada data ditemukan</td>
         </tr>
       </tbody>
     </v-table>

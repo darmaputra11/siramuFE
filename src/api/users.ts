@@ -40,3 +40,6 @@ export const getUserById = (id: number) => {
 export const deleteUser = (id: number) => {
   return http.delete(`/users/${id}`)
 }
+
+export const resetUserPassword = (id: number, password: string) =>
+  http.put(`/users/${id}/password`, { password })
