@@ -2,13 +2,18 @@
 import { clearAuth, getToken, setToken } from "@/utils/AuthStorage"
 import axios, { AxiosError, AxiosRequestConfig } from "axios"
 
+
+const useProxy = (import.meta.env.VITE_USE_PROXY === 'true')
+
+
 // Ambil dari ENV Netlify, rapikan trailing slash
 const raw = (import.meta.env.VITE_API_BASE_URL as string | undefined) || ""
 const apiBase = raw.replace(/\/+$/, "")
 
 // Jika ENV ada -> pakai https://.../siramu-api2/api
 // Jika ENV kosong -> fallback '/api' (bisa diproxy via Netlify.toml)
-const BASE_URL = apiBase ? `${apiBase}/api` : "/api"
+// Proxy menang jika VITE_USE_PROXY=true, selain itu pakai ENV
+const BASE_URL = useProxy ? '/api' : (apiBase ? `${apiBase}/api` : '/api')
 
 const http = axios.create({
   baseURL: BASE_URL,

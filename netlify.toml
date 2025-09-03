@@ -1,0 +1,16 @@
+[build]
+  command = "pnpm build"
+  publish = "dist"
+
+# PROXY backend
+[[redirects]]
+  from = "/api/*"
+  to = "https://siramu-9ff58.ondigitalocean.app/siramu-api2/api/:splat"
+  status = 200
+  force = true
+
+# SPA fallback
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
