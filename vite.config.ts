@@ -41,11 +41,11 @@ export default defineConfig({
     },
   },
   server: {
-    host: '127.0.0.1',         // ⬅️ penting: gunakan 127.0.0.1 (bukan "localhost")
+    host: 'https://siramu-9ff58.ondigitalocean.app/siramu-api2',         // ⬅️ penting: gunakan 127.0.0.1 (bukan "localhost")
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:8000', // ⬅️ URL Laravel kamu
+        target: 'https://siramu-9ff58.ondigitalocean.app/siramu-api2', // ⬅️ URL Laravel kamu
         changeOrigin: true,
         // optional kalau backend butuh:
         // secure: false,

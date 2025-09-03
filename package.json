@@ -10,7 +10,8 @@
     "typecheck": "vue-tsc --noEmit",
     "lint": "eslint . -c .eslintrc.cjs --fix --ext .ts,.js,.cjs,.vue,.tsx,.jsx",
     "build:icons": "tsx src/plugins/iconify/build-icons.ts",
-    "postinstall": "npm run build:icons"
+    "prebuild": "pnpm run build:icons",
+    "postinstall": "node -e \"if(!process.env.CI){require('child_process').execSync('pnpm run build:icons',{stdio:'inherit'})}\""
   },
   "dependencies": {
     "@floating-ui/dom": "1.6.8",
