@@ -11,6 +11,7 @@
  * For Iconify Tools documentation visit https://docs.iconify.design/tools/tools2/
  */
 import { promises as fs } from 'node:fs'
+import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 
 // Installation: npm install --save-dev @iconify/tools @iconify/utils @iconify/json @iconify/iconify
@@ -18,6 +19,8 @@ import { cleanupSVG, importDirectory, isEmptyColor, parseColors, runSVGO } from 
 import type { IconifyJSON } from '@iconify/types'
 import { getIcons, getIconsCSS, stringToIcon } from '@iconify/utils'
 
+
+const require = createRequire(import.meta.url)
 /**
  * Script configuration
  */
