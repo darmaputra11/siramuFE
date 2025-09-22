@@ -173,7 +173,7 @@ async function submitForm() {
   try {
     await updateBayi(id.value, { ...form.value })
     original.value = { ...form.value }
-    router.push('/bayi')
+    router.push('/daftarbayi')
   } catch (e: any) {
     if (e?.response?.status === 401) {
       alert('Sesi habis. Silakan login kembali.')
