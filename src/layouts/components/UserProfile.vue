@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { logoutApi } from "@/api/auth"
+import { logoutApi } from "@/api/auth";
 import { useAuthStore } from "@/store/auth"; // ⬅️ ganti ke '@/store/auth' jika itu path-mu
 import { clearAuth } from "@/utils/AuthStorage"; // sesuaikan huruf besar/kecil filenya
-import avatar1 from '@images/avatars/avatar-1.png'
-import { computed } from "vue"
-import { useRouter } from "vue-router"
+import avatar1 from '@images/avatars/avatar-1.png';
+import { computed } from "vue";
+import { useRouter } from "vue-router";
 
 const router = useRouter()
 const auth = useAuthStore()

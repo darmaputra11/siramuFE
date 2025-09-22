@@ -52,6 +52,17 @@ export default defineConfig({
       },
     },
   },
+//   server: {
+//   host: '127.0.0.1', // biar frontend bisa jalan di lokal
+//   port: 5173,
+//   proxy: {
+//     '/api': {
+//       target: 'http://127.0.0.1:8000', // arahkan ke backend Laravel lokal
+//       changeOrigin: true,
+//       secure: false,
+//     },
+//   },
+// },
   build: { chunkSizeWarningLimit: 5000 },
   optimizeDeps: {
     exclude: ['vuetify'],

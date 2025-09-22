@@ -1,3 +1,4 @@
+
 export const routes = [
   { path: '/', redirect: '/login' },
 
@@ -58,6 +59,21 @@ export const routes = [
       {
         path: 'aktapindah/:id/edit',
         component: () => import('@/views/adminView/EditAktaPindah.vue'),
+        meta: { requiresAuth: true, roles: ['admin'] },
+      },
+      {
+        path: 'daftarbayi',
+        component: () => import('@/views/adminView/DaftarBayi.vue'),
+        meta: { requiresAuth: true, roles: ['admin','viewer'] },
+      },
+      {
+        path: 'daftarbayi/create',
+        component: () => import('@/views/adminView/AddDaftarBayi.vue'),
+        meta: { requiresAuth: true, roles: ['admin'] },
+      },
+      {
+        path: 'daftarbayi/:id/edit',
+        component: () => import('@/views/adminView/EditDaftarBayi.vue'),
         meta: { requiresAuth: true, roles: ['admin'] },
       },
 

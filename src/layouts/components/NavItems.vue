@@ -36,5 +36,8 @@ const isAdmin = computed(() => role.value === 'admin')
     <VerticalNavLink
       :item="{ title: 'Data Pindah', to: '/aktapindah' }"
     />
+    <VerticalNavLink
+      :item="{ title: 'Data Bayi', to: '/daftarbayi' }"
+    />
   </VerticalNavGroup>
 </template>
