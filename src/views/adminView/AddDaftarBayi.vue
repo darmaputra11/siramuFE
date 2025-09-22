@@ -146,7 +146,7 @@ async function submitForm() {
       nama_ibu_kandung: form.value.nama_ibu_kandung,
       tgl_lahir_ibu_kandung: form.value.tgl_lahir_ibu_kandung,
     })
-    router.push('/bayi') // kembali ke list
+    router.push('/daftarbayi') // kembali ke list
   } catch (e: any) {
     if (e?.response?.status === 401) {
       alert('Sesi habis. Silakan login kembali.')
